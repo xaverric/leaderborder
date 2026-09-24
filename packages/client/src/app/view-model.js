@@ -14,7 +14,7 @@ const ERROR_COPY = {
   tokscale_failed: "Could not read local usage. Leaderborder will retry at the next sync.",
   upload_failed: "Upload failed. Leaderborder will retry at the next sync.",
   network: "No connection to the leaderboard. Leaderborder will retry at the next sync.",
-  forbidden: "Your GitHub account is not allowed on this leaderboard.",
+  forbidden: "Access requested. The leaderboard admin has to approve your GitHub account; sign in again once approved.",
   unauthorized: "Your device login expired or was revoked. Sign in again.",
   not_logged_in: "You are signed out. Sign in again.",
 };

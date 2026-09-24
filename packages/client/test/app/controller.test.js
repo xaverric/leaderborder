@@ -128,7 +128,7 @@ test("forbidden login returns to signed-out with a notice", async () => {
   await controller.login();
   const view = controller.view();
   assert.equal(view.kind, "signed-out");
-  assert.match(view.notice, /not allowed/);
+  assert.match(view.notice, /Access requested/);
 });
 
 test("copyCode copies only the current device code", async () => {

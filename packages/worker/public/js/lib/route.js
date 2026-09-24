@@ -13,6 +13,7 @@ const decode = (value) => {
 const matchSegments = (segments) => {
   if (segments.length === 0) return { name: "leaderboard" };
   if (segments.length === 1 && segments[0] === "devices") return { name: "devices" };
+  if (segments.length === 1 && segments[0] === "admin") return { name: "admin" };
   if (segments.length === 2 && segments[0] === "u") {
     const login = decode(segments[1]);
     return LOGIN.test(login) ? { name: "user", login } : NOT_FOUND;
@@ -34,6 +35,7 @@ export const parseRoute = (pathname, hash = "") => {
 const suffix = (route) => {
   if (route.name === "user") return `/u/${encodeURIComponent(route.login)}`;
   if (route.name === "devices") return "/devices";
+  if (route.name === "admin") return "/admin";
   return "";
 };
 
