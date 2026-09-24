@@ -1,6 +1,7 @@
 import { api } from "../api.js";
 import { relativeTime } from "../lib/format.js";
 import { clear, h, skeleton } from "../ui/dom.js";
+import { githubLink } from "../ui/github.js";
 import { toast } from "../ui/toast.js";
 
 const LOGIN = /^[A-Za-z0-9][A-Za-z0-9-]{0,38}$/;
@@ -22,7 +23,7 @@ const who = (person, meta) =>
     h(
       "div",
       { class: "admin-row__text" },
-      h("span", { class: "admin-row__name" }, person.name, " ", h("span", { class: "muted" }, `@${person.login}`), ...(person.tags ?? [])),
+      h("span", { class: "admin-row__name" }, person.name, " ", githubLink(person.login, { className: "gh-link muted" }), ...(person.tags ?? [])),
       meta ? h("span", { class: "admin-row__meta muted" }, meta) : null,
     ),
   );

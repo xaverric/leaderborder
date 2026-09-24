@@ -5,6 +5,7 @@ import { filtersFromSearch, leaderboardQuery } from "../lib/query.js";
 import { clientLabel, clientSlot } from "../lib/share.js";
 import { renderLegend, renderShareBar, renderSparkline } from "../ui/charts.js";
 import { clear, h, skeleton } from "../ui/dom.js";
+import { githubLink } from "../ui/github.js";
 
 const DESKTOP = "(min-width: 48rem)";
 
@@ -91,7 +92,7 @@ const boardRow = (entry, board, me, ctx) => {
       "span",
       { class: "board-row__who" },
       h("a", { class: "board-row__name", href: ctx.href({ name: "user", login: entry.login }) }, name),
-      h("span", { class: "board-row__login muted" }, `@${entry.login}`, isMe ? h("span", { class: "tag" }, "You") : null),
+      h("span", { class: "board-row__login muted" }, githubLink(entry.login), isMe ? h("span", { class: "tag" }, "You") : null),
     ),
     h("span", { class: "board-row__share" }, renderShareBar(entry.byClient, { metric: board.metric })),
     h("span", { class: "board-row__spark" }, renderSparkline(entry.sparkline, { label: `Last 30 days for ${name}` })),
