@@ -200,13 +200,6 @@
                 <button class="btn btn--sm copy-btn" type="button" data-copy="brew install --cask xaverric/tap/leaderborder">Copy</button>
               </div>
             </li>
-            <li class="install__alt install__alt--dmg">
-              <span class="install__label">Disk image</span>
-              <div class="install__dmg">
-                <a class="btn btn--sm" href="https://github.com/xaverric/leaderborder/releases/latest">Download the DMG</a>
-                <p class="install__note">The app is not signed yet. On first launch, right click it in Applications and choose Open.</p>
-              </div>
-            </li>
           </ul>
         </div>
       </section>
@@ -217,32 +210,36 @@
           <p class="section__lead">Usage is collected by the open-source <a href="https://github.com/junhoyeo/tokscale">tokscale</a> engine running locally. leaderborder uploads only the aggregates below.</p>
         </div>
         <div class="privacy">
-          <div class="privacy__col card">
-            <h3 class="privacy__title"><span class="privacy__mark privacy__mark--yes" aria-hidden="true"></span>Sent, per day, tool and model</h3>
-            <ul class="privacy__list">
-              <li>Input, output, cache read and cache write token counts</li>
-              <li>Reasoning tokens and message count</li>
-              <li>API-equivalent cost in USD</li>
-              <li>The tool and model names</li>
-              <li>Your GitHub login, name and avatar, and the device name you pick</li>
+          <figure class="privacy__sent card">
+            <figcaption class="privacy__title"><span class="privacy__mark privacy__mark--yes" aria-hidden="true"></span>Sent: one row per day, tool and model</figcaption>
+            <pre class="payload" tabindex="0" aria-label="Example of one uploaded row"><code><span class="payload__p">{</span>
+  <span class="payload__k">"day"</span>: <span class="payload__s">"2026-09-24"</span>,
+  <span class="payload__k">"client"</span>: <span class="payload__s">"claude"</span>,
+  <span class="payload__k">"model"</span>: <span class="payload__s">"claude-opus-5"</span>,
+  <span class="payload__k">"input"</span>: <span class="payload__n">18204</span>,
+  <span class="payload__k">"output"</span>: <span class="payload__n">96311</span>,
+  <span class="payload__k">"cacheRead"</span>: <span class="payload__n">41872650</span>,
+  <span class="payload__k">"cacheWrite"</span>: <span class="payload__n">1203344</span>,
+  <span class="payload__k">"reasoning"</span>: <span class="payload__n">0</span>,
+  <span class="payload__k">"costUsd"</span>: <span class="payload__n">31.84</span>,
+  <span class="payload__k">"messages"</span>: <span class="payload__n">214</span>
+<span class="payload__p">}</span></code></pre>
+            <p class="privacy__foot">An example row. Your GitHub login, name and avatar and the device name you pick are stored alongside it.</p>
+          </figure>
+          <div class="privacy__kept card">
+            <h3 class="privacy__title"><span class="privacy__mark privacy__mark--no" aria-hidden="true"></span>Stays on your Mac</h3>
+            <p class="privacy__zero"><span class="privacy__zero-n tnum">0</span><span class="privacy__zero-l">bytes of your prompts, code or paths are uploaded. There is no field for them.</span></p>
+            <ul class="chips" aria-label="Never uploaded">
+              <li class="chip"><svg class="chip__icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.25 7V5.25a2.75 2.75 0 0 1 5.5 0V7h.5A1.75 1.75 0 0 1 13 8.75v4.5A1.75 1.75 0 0 1 11.25 15h-6.5A1.75 1.75 0 0 1 3 13.25v-4.5A1.75 1.75 0 0 1 4.75 7h.5Zm1.5 0h2.5V5.25a1.25 1.25 0 0 0-2.5 0V7Z" /></svg>Prompts</li>
+              <li class="chip"><svg class="chip__icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.25 7V5.25a2.75 2.75 0 0 1 5.5 0V7h.5A1.75 1.75 0 0 1 13 8.75v4.5A1.75 1.75 0 0 1 11.25 15h-6.5A1.75 1.75 0 0 1 3 13.25v-4.5A1.75 1.75 0 0 1 4.75 7h.5Zm1.5 0h2.5V5.25a1.25 1.25 0 0 0-2.5 0V7Z" /></svg>Model responses</li>
+              <li class="chip"><svg class="chip__icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.25 7V5.25a2.75 2.75 0 0 1 5.5 0V7h.5A1.75 1.75 0 0 1 13 8.75v4.5A1.75 1.75 0 0 1 11.25 15h-6.5A1.75 1.75 0 0 1 3 13.25v-4.5A1.75 1.75 0 0 1 4.75 7h.5Zm1.5 0h2.5V5.25a1.25 1.25 0 0 0-2.5 0V7Z" /></svg>Code and diffs</li>
+              <li class="chip"><svg class="chip__icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.25 7V5.25a2.75 2.75 0 0 1 5.5 0V7h.5A1.75 1.75 0 0 1 13 8.75v4.5A1.75 1.75 0 0 1 11.25 15h-6.5A1.75 1.75 0 0 1 3 13.25v-4.5A1.75 1.75 0 0 1 4.75 7h.5Zm1.5 0h2.5V5.25a1.25 1.25 0 0 0-2.5 0V7Z" /></svg>File contents</li>
+              <li class="chip"><svg class="chip__icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.25 7V5.25a2.75 2.75 0 0 1 5.5 0V7h.5A1.75 1.75 0 0 1 13 8.75v4.5A1.75 1.75 0 0 1 11.25 15h-6.5A1.75 1.75 0 0 1 3 13.25v-4.5A1.75 1.75 0 0 1 4.75 7h.5Zm1.5 0h2.5V5.25a1.25 1.25 0 0 0-2.5 0V7Z" /></svg>File paths</li>
+              <li class="chip"><svg class="chip__icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.25 7V5.25a2.75 2.75 0 0 1 5.5 0V7h.5A1.75 1.75 0 0 1 13 8.75v4.5A1.75 1.75 0 0 1 11.25 15h-6.5A1.75 1.75 0 0 1 3 13.25v-4.5A1.75 1.75 0 0 1 4.75 7h.5Zm1.5 0h2.5V5.25a1.25 1.25 0 0 0-2.5 0V7Z" /></svg>Project names</li>
+              <li class="chip"><svg class="chip__icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.25 7V5.25a2.75 2.75 0 0 1 5.5 0V7h.5A1.75 1.75 0 0 1 13 8.75v4.5A1.75 1.75 0 0 1 11.25 15h-6.5A1.75 1.75 0 0 1 3 13.25v-4.5A1.75 1.75 0 0 1 4.75 7h.5Zm1.5 0h2.5V5.25a1.25 1.25 0 0 0-2.5 0V7Z" /></svg>Repository names</li>
+              <li class="chip"><svg class="chip__icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.25 7V5.25a2.75 2.75 0 0 1 5.5 0V7h.5A1.75 1.75 0 0 1 13 8.75v4.5A1.75 1.75 0 0 1 11.25 15h-6.5A1.75 1.75 0 0 1 3 13.25v-4.5A1.75 1.75 0 0 1 4.75 7h.5Zm1.5 0h2.5V5.25a1.25 1.25 0 0 0-2.5 0V7Z" /></svg>Session ids</li>
             </ul>
-          </div>
-          <div class="privacy__col card">
-            <h3 class="privacy__title"><span class="privacy__mark privacy__mark--no" aria-hidden="true"></span>Never sent</h3>
-            <ul class="privacy__list">
-              <li>Prompts or model responses</li>
-              <li>Code, diffs or file contents</li>
-              <li>File paths</li>
-              <li>Project or repository names</li>
-              <li>Session ids</li>
-            </ul>
-          </div>
-        </div>
-        <div class="privacy__check">
-          <p>Check it yourself. This prints every row before anything is uploaded:</p>
-          <div class="code-line">
-            <code>leaderborder sync --dry-run</code>
-            <button class="btn btn--sm copy-btn" type="button" data-copy="leaderborder sync --dry-run">Copy</button>
+            <p class="privacy__foot">tokscale reads and sums your local logs on your Mac. Only rows like the example ever leave it.</p>
           </div>
         </div>
       </section>
