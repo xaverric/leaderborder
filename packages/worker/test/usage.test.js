@@ -84,7 +84,7 @@ describe("PUT /api/usage", () => {
     const response = await put(payload(), { envOverrides: { USAGE_LIMITER: { limit } } });
     expect(response.status).toBe(429);
     expect((await response.json()).error.code).toBe("rate_limited");
-    expect(limit).toHaveBeenCalledWith({ key: expect.stringMatching(/^[0-9a-f]{64}$/) });
+    expect(limit).toHaveBeenCalledWith({ key: device.deviceId });
     expect(await stored()).toEqual([]);
   });
 

@@ -1,10 +1,17 @@
+import { env } from "cloudflare:workers";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { SECURITY_HEADERS, STRICT_TRANSPORT_SECURITY } from "../src/http.js";
 import { call } from "./helpers.js";
 
 const expectSecurityHeaders = (response) => {
   expect(response.headers.get("x-content-type-options")).toBe("nosniff");
   expect(response.headers.get("referrer-policy")).toBe("strict-origin-when-cross-origin");
   expect(response.headers.get("x-frame-options")).toBe("DENY");
+  expect(response.headers.get("content-security-policy")).toContain("script-src 'self'");
+  expect(response.headers.get("content-security-policy")).toContain("frame-ancestors 'none'");
+  expect(response.headers.get("strict-transport-security")).toBe("max-age=31536000; includeSubDomains");
+  expect(response.headers.get("content-security-policy")).not.toContain("unsafe-inline");
+  expect(response.headers.get("cross-origin-opener-policy")).toBe("same-origin");
 };
 
 afterEach(() => vi.restoreAllMocks());
@@ -13,7 +20,7 @@ describe("GET /api/config", () => {
   it("returns the public client id", async () => {
     const response = await call("GET", "/api/config");
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ githubClientId: "test-client-id", apiVersion: 1 });
+    expect(await response.json()).toEqual({ githubClientId: "test-client-id", githubScope: "", apiVersion: 1, build: null });
     expect(response.headers.get("content-type")).toMatch(/^application\/json/);
     expect(response.headers.get("cache-control")).toBe("no-store");
     expectSecurityHeaders(response);
@@ -46,11 +53,28 @@ describe("routing errors", () => {
   });
 });
 
+describe("static asset headers", () => {
+  it("keeps public/_headers in sync with the worker security headers", () => {
+    const declared = Object.fromEntries(
+      env.TEST_STATIC_HEADERS.split("\n")
+        .filter((line) => line.startsWith("  "))
+        .map((line) => line.trim())
+        .map((line) => [line.slice(0, line.indexOf(":")).toLowerCase(), line.slice(line.indexOf(":") + 1).trim()]),
+    );
+    expect(declared).toEqual({ ...SECURITY_HEADERS, "strict-transport-security": STRICT_TRANSPORT_SECURITY });
+  });
+
+  it("does not require a body before rejecting anonymous uploads", async () => {
+    const response = await call("PUT", "/api/usage", { raw: "{}", headers: { "content-type": "application/json" } });
+    expect(response.status).toBe(401);
+  });
+});
+
 describe("request bodies", () => {
   it("rejects a declared body over 512 KB with 413", async () => {
     const response = await call("PUT", "/api/usage", {
       raw: "{}",
-      headers: { "content-type": "application/json", "content-length": String(512 * 1024 + 1) },
+      headers: { "content-type": "application/json", "content-length": String(512 * 1024 + 1), authorization: `Bearer lb_${"a".repeat(43)}` },
     });
     expect(response.status).toBe(413);
     expect((await response.json()).error.code).toBe("invalid_request");

@@ -112,6 +112,7 @@ export const renderLeaderboard = (view, ctx) => {
   ctx.setTitle("Leaderboard");
   const filters = filtersFromSearch(location.search);
   let requestId = 0;
+  ctx.onCleanup(() => requestId++);
   let lastBoard = null;
 
   const rangeLine = h("p", { class: "view__sub muted" }, skeleton("skeleton--long"));

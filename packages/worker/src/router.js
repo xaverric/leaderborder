@@ -4,6 +4,7 @@ const compile = (path) => {
     keys.push(key);
     return "([^/]+)";
   });
+  // eslint-disable-next-line security/detect-non-literal-regexp
   return { pattern: new RegExp(`^${source}$`), keys };
 };
 

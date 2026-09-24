@@ -1,3 +1,14 @@
+export const isLocalApp = (env) => {
+  try {
+    const url = new URL(env.APP_URL);
+    return url.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+  } catch {
+    return false;
+  }
+};
+
+export const cookieName = (name, env) => isLocalApp(env) ? name : `__Host-${name}`;
+
 export const parseCookies = (header) =>
   Object.fromEntries(
     (header ?? "")

@@ -95,7 +95,7 @@ const showChrome = (me) => {
   $("[data-nav]").hidden = !me;
   $("[data-me]").hidden = !me;
   if (!me) return;
-  $("[data-me-avatar]").src = me.user.avatarUrl;
+  if (me.user.avatarUrl) $("[data-me-avatar]").src = me.user.avatarUrl;
   $("[data-me-name]").textContent = me.user.name ?? me.user.login;
   $("[data-me-login]").textContent = `@${me.user.login}`;
 };

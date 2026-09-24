@@ -90,6 +90,7 @@ export const renderUser = (view, ctx, login) => {
       clear(breakdownSlot).append(renderBreakdown(groupByClient(detail.byClientModel, key), { metric }));
     };
 
+    const deviceCount = detail.deviceCount ?? detail.devices.length;
     const devices = detail.devices.length
       ? h(
           "ul",
@@ -98,7 +99,7 @@ export const renderUser = (view, ctx, login) => {
             h("li", {}, h("span", { class: "device-mini__name" }, device.name), h("span", { class: "muted" }, `Last sync ${relativeTime(device.lastSyncAt)}`)),
           ),
         )
-      : h("p", { class: "muted" }, "No devices registered.");
+      : h("p", { class: "muted" }, deviceCount ? `${deviceCount} ${deviceCount === 1 ? "device" : "devices"} registered.` : "No devices registered.");
 
     clear(view).append(
       h(

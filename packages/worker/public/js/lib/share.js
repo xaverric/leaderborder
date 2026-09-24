@@ -11,9 +11,9 @@ const LABELS = {
   other: "Other",
 };
 
-export const clientSlot = (client) => SLOTS[client] ?? "other";
+export const clientSlot = (client) => Object.hasOwn(SLOTS, client) ? SLOTS[client] : "other";
 
-export const clientLabel = (client) => LABELS[client] ?? client;
+export const clientLabel = (client) => Object.hasOwn(LABELS, client) ? LABELS[client] : client;
 
 export const shareSegments = (byClient = {}, { limit = Infinity } = {}) => {
   const entries = Object.entries(byClient ?? {})

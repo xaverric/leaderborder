@@ -18,7 +18,11 @@ const pickMetric = { tokens: (t) => t.tokens, tokens_nocache: (t) => t.tokensNoC
 
 export const rankEntries = (items) => {
   const sorted = [...items].sort((a, b) => b.value - a.value || a.login.localeCompare(b.login));
-  return sorted.map((item) => ({ ...item, rank: 1 + sorted.filter((other) => other.value > item.value).length }));
+  let rank = 0;
+  return sorted.map((item, index) => {
+    if (index === 0 || item.value !== sorted[index - 1].value) rank = index + 1;
+    return { ...item, rank };
+  });
 };
 
 export const denseSeries = (days, rows, toEntry) => {
@@ -26,8 +30,14 @@ export const denseSeries = (days, rows, toEntry) => {
   return days.map((day) => toEntry(day, byDay.get(day)));
 };
 
-const groupBy = (rows, key) =>
-  rows.reduce((groups, row) => groups.set(row[key], [...(groups.get(row[key]) ?? []), row]), new Map());
+const groupBy = (rows, key) => {
+  const groups = new Map();
+  for (const row of rows) {
+    if (!groups.has(row[key])) groups.set(row[key], []);
+    groups.get(row[key]).push(row);
+  }
+  return groups;
+};
 
 export const toRankedTotals = (metric, totals) =>
   rankEntries(totals.map((row) => ({ id: row.id, login: row.login, row, ...totalsOf(row), value: pickMetric[metric](totalsOf(row)) })));

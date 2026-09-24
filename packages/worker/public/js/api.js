@@ -21,6 +21,7 @@ const writeStorage = (value) => {
 };
 
 const resolveMockMode = () => {
+  if (!["localhost", "127.0.0.1", "[::1]"].includes(location.hostname)) return "";
   const param = new URLSearchParams(location.search).get("mock");
   if (param === "0") writeStorage("");
   else if (MODES.includes(param)) writeStorage(param);

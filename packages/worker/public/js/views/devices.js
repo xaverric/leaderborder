@@ -43,6 +43,7 @@ export const renderDevices = (view, ctx) => {
       await api.del(`/api/me/devices/${encodeURIComponent(device.id)}`);
       devices = devices.filter((d) => d.id !== device.id);
       if (ctx.me) ctx.me.devices = ctx.me.devices.filter((d) => d.id !== device.id);
+      toast({ message: `${device.name} revoked.` });
     } catch (error) {
       if (error.status === 404) {
         devices = devices.filter((d) => d.id !== device.id);
@@ -59,7 +60,7 @@ export const renderDevices = (view, ctx) => {
     pending.add(device.id);
     draw();
     toast({
-      message: `${device.name} revoked.`,
+      message: `${device.name} will be revoked.`,
       action: {
         label: "Undo",
         run: () => {
@@ -71,6 +72,16 @@ export const renderDevices = (view, ctx) => {
     });
   }
 
+  const deleteAccount = async () => {
+    if (!window.confirm("Delete your leaderborder account, all devices and all uploaded usage? This cannot be undone.")) return;
+    try {
+      await api.del("/api/me");
+      window.location.assign("/");
+    } catch (error) {
+      toast({ tone: "error", message: `Account was not deleted. ${error.message}`, timeout: 0 });
+    }
+  };
+
   clear(view).append(
     h(
       "div",
@@ -79,10 +90,17 @@ export const renderDevices = (view, ctx) => {
         "header",
         { class: "view__head" },
         h("h1", { class: "view__title" }, "Your devices"),
-        h("p", { class: "view__sub muted" }, "Every Mac that syncs has its own token. Revoking one signs it out; it has to sign in again before it can upload."),
+        h("p", { class: "view__sub muted" }, "Every Mac that syncs has its own token. Revoking one signs it out; it has to sign in again before it can upload. Device tokens expire after 90 days."),
       ),
       list,
       empty,
+      h(
+        "section",
+        { class: "card danger-zone" },
+        h("h2", { class: "danger-zone__title" }, "Delete account"),
+        h("p", { class: "muted" }, "Removes your profile, every device token and all usage you uploaded. Historical leaderboards will no longer include you."),
+        h("button", { class: "btn btn--sm btn--danger", type: "button", onclick: deleteAccount }, "Delete my account and data"),
+      ),
     ),
   );
   draw();

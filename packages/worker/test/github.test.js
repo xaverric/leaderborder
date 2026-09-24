@@ -4,6 +4,7 @@ import { exchangeCode, resolveGithubAccess } from "../src/github.js";
 const env = (overrides = {}) => ({
   ALLOWED_GITHUB_ORGS: "",
   ALLOWED_GITHUB_LOGINS: "",
+  PUBLIC_ACCESS: "1",
   GITHUB_CLIENT_ID: "cid",
   GITHUB_CLIENT_SECRET: "csecret",
   ...overrides,
@@ -22,7 +23,7 @@ afterEach(() => vi.restoreAllMocks());
 
 describe("resolveGithubAccess", () => {
   it("returns the profile and skips org lookup when no orgs are configured", async () => {
-    const spy = respond({ "https://api.github.com/user": { body: user } });
+    const spy = respond({ "https://api.github.com/applications/cid/token": { body: { user, scopes: [] } } });
     const result = await resolveGithubAccess("gho_x", env());
     expect(result).toEqual({
       profile: { githubId: 42, login: "ada", name: "Ada Lovelace", avatarUrl: "https://avatars.githubusercontent.com/u/42" },
@@ -31,14 +32,16 @@ describe("resolveGithubAccess", () => {
     expect(spy).toHaveBeenCalledTimes(1);
     const [, init] = spy.mock.calls[0];
     const headers = new Headers(init.headers);
-    expect(headers.get("authorization")).toBe("Bearer gho_x");
+    expect(init.method).toBe("POST");
+    expect(headers.get("authorization")).toBe(`Basic ${btoa("cid:csecret")}`);
+    expect(JSON.parse(init.body)).toEqual({ access_token: "gho_x" });
     expect(headers.get("user-agent")).toBe("leaderborder");
     expect(headers.get("accept")).toBe("application/vnd.github+json");
   });
 
   it("checks org membership when orgs are configured", async () => {
     respond({
-      "https://api.github.com/user": { body: user },
+      "https://api.github.com/applications/cid/token": { body: { user } },
       "https://api.github.com/user/orgs?per_page=100": { body: [{ login: "Acme" }] },
     });
     expect((await resolveGithubAccess("t", env({ ALLOWED_GITHUB_ORGS: "acme" }))).allowed).toBe(true);
@@ -46,24 +49,43 @@ describe("resolveGithubAccess", () => {
   });
 
   it("skips org lookup when the login is already allowed", async () => {
-    const spy = respond({ "https://api.github.com/user": { body: user } });
+    const spy = respond({ "https://api.github.com/applications/cid/token": { body: { user } } });
     expect((await resolveGithubAccess("t", env({ ALLOWED_GITHUB_ORGS: "acme", ALLOWED_GITHUB_LOGINS: "ada" }))).allowed).toBe(true);
     expect(spy).toHaveBeenCalledTimes(1);
   });
 
+  it("checks allowed organizations beyond the first GitHub page", async () => {
+    respond({
+      "https://api.github.com/applications/cid/token": { body: { user } },
+      "https://api.github.com/user/orgs?per_page=100": { body: Array.from({ length: 100 }, (_, i) => ({ login: `org-${i}` })) },
+      "https://api.github.com/user/orgs?per_page=100&page=2": { body: [{ login: "Acme" }] },
+    });
+    expect((await resolveGithubAccess("t", env({ ALLOWED_GITHUB_ORGS: "acme" }))).allowed).toBe(true);
+  });
+
   it("throws unauthorized when GitHub rejects the token", async () => {
-    respond({ "https://api.github.com/user": { status: 401, body: { message: "Bad credentials" } } });
+    respond({ "https://api.github.com/applications/cid/token": { status: 404, body: { message: "Not Found" } } });
     await expect(resolveGithubAccess("bad", env())).rejects.toMatchObject({ status: 401, code: "unauthorized" });
   });
 
   it("throws internal when GitHub fails", async () => {
-    respond({ "https://api.github.com/user": { status: 502, body: {} } });
+    respond({ "https://api.github.com/applications/cid/token": { status: 502, body: {} } });
     await expect(resolveGithubAccess("t", env())).rejects.toMatchObject({ status: 500, code: "internal" });
   });
 
   it("uses the login as name fallback", async () => {
-    respond({ "https://api.github.com/user": { body: { ...user, name: null } } });
+    respond({ "https://api.github.com/applications/cid/token": { body: { user: { ...user, name: null } } } });
     expect((await resolveGithubAccess("t", env())).profile.name).toBe("ada");
+  });
+
+  it("drops avatar urls outside avatars.githubusercontent.com", async () => {
+    respond({ "https://api.github.com/applications/cid/token": { body: { user: { ...user, avatar_url: "https://evil.example/a.png" } } } });
+    expect((await resolveGithubAccess("t", env())).profile.avatarUrl).toBeNull();
+  });
+
+  it("rejects malformed user objects", async () => {
+    respond({ "https://api.github.com/applications/cid/token": { body: { user: { id: "1", login: "<x>" } } } });
+    await expect(resolveGithubAccess("t", env())).rejects.toMatchObject({ status: 500 });
   });
 });
 

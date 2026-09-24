@@ -2,17 +2,26 @@ import { createExecutionContext, waitOnExecutionContext } from "cloudflare:test"
 import { env } from "cloudflare:workers";
 import { vi } from "vitest";
 import worker from "../src/index.js";
-import { SESSION_COOKIE, signValue } from "../src/session.js";
+import { cookieName } from "../src/cookies.js";
+import { SESSION_COOKIE, createSession } from "../src/session.js";
 
 export const ORIGIN = "https://leaderborder.test";
 
+export const okLimiter = () => ({ limit: async () => ({ success: true }) });
+
+export const TEST_SECRET = "test-session-secret-0123456789abcdef";
+
 export const makeEnv = (overrides = {}) => ({
   DB: env.DB,
+  USAGE_LIMITER: okLimiter(),
+  AUTH_LIMITER: okLimiter(),
+  API_LIMITER: okLimiter(),
+  PUBLIC_ACCESS: "1",
   ASSETS: { fetch: async (request) => new Response(`asset ${new URL(request.url).pathname}`, { headers: { "content-type": "text/html" } }) },
   APP_URL: ORIGIN,
   GITHUB_CLIENT_ID: "test-client-id",
   GITHUB_CLIENT_SECRET: "test-client-secret",
-  SESSION_SECRET: "test-session-secret",
+  SESSION_SECRET: TEST_SECRET,
   ALLOWED_GITHUB_ORGS: "",
   ALLOWED_GITHUB_LOGINS: "",
   LEADERBOARD_TZ: "Europe/Prague",
@@ -26,17 +35,18 @@ export const call = async (method, path, { body, headers = {}, env: envOverrides
     init.body = JSON.stringify(body);
     init.headers["content-type"] ??= "application/json";
   }
+  if (init.headers.cookie && !["GET", "HEAD"].includes(method)) init.headers.origin ??= ORIGIN;
   const ctx = createExecutionContext();
-  const response = await worker.fetch(new Request(`${ORIGIN}${path}`, init), makeEnv(envOverrides), ctx);
+  const response = await worker.fetch(new Request(new URL(path, ORIGIN), init), makeEnv(envOverrides), ctx);
   await waitOnExecutionContext(ctx);
   return response;
 };
 
 export const resetDb = () =>
-  env.DB.batch(["usage_daily", "api_tokens", "devices", "users"].map((table) => env.DB.prepare(`DELETE FROM ${table}`)));
+  env.DB.batch(["web_sessions", "usage_daily", "api_tokens", "devices", "users"].map((table) => env.DB.prepare(`DELETE FROM ${table}`)));
 
 export const sessionCookie = async (uid, exp = Math.floor(Date.now() / 1000) + 3600) =>
-  `${SESSION_COOKIE}=${await signValue({ uid, exp }, "test-session-secret")}`;
+  `${cookieName(SESSION_COOKIE, makeEnv())}=${await createSession(makeEnv(), uid, Math.floor(Date.now() / 1000), exp)}`;
 
 export const githubUser = (id, login, extra = {}) => ({
   id,
@@ -46,7 +56,7 @@ export const githubUser = (id, login, extra = {}) => ({
   ...extra,
 });
 
-export const mockGithub = ({ users = {}, orgs = {}, codes = {} } = {}) =>
+export const mockGithub = ({ users = {}, orgs = {}, codes = {}, foreign = {} } = {}) =>
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init = {}) => {
     const request = new Request(input, init);
     const url = new URL(request.url);
@@ -55,8 +65,13 @@ export const mockGithub = ({ users = {}, orgs = {}, codes = {} } = {}) =>
       const { code } = await request.json();
       return Response.json(codes[code] ? { access_token: codes[code] } : { error: "bad_verification_code" });
     }
+    if (url.href === "https://api.github.com/applications/test-client-id/token" && request.method === "POST") {
+      const { access_token: checked } = await request.json();
+      return users[checked] ? Response.json({ user: users[checked], scopes: ["read:org"] }) : Response.json({ message: "Not Found" }, { status: 404 });
+    }
     if (url.href === "https://api.github.com/user") {
-      return users[token] ? Response.json(users[token]) : Response.json({ message: "Bad credentials" }, { status: 401 });
+      const user = users[token] ?? foreign[token];
+      return user ? Response.json(user) : Response.json({ message: "Bad credentials" }, { status: 401 });
     }
     if (url.pathname === "/user/orgs") return Response.json((orgs[token] ?? []).map((login) => ({ login })));
     return new Response("unexpected", { status: 599 });

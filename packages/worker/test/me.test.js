@@ -53,8 +53,8 @@ describe("GET /api/me", () => {
   });
 
   it("rejects a session signed with another secret or expired", async () => {
-    const foreign = await signValue({ uid: adaId, exp: 9999999999 }, "other-secret");
-    expect((await call("GET", "/api/me", { headers: { cookie: `lb_session=${foreign}` } })).status).toBe(401);
+    const foreign = await signValue({ uid: adaId, exp: 9999999999 }, "other-secret-0123456789abcdef0123456789");
+    expect((await call("GET", "/api/me", { headers: { cookie: `__Host-lb_session=${foreign}` } })).status).toBe(401);
     const expired = await sessionCookie(adaId, Math.floor(Date.now() / 1000) - 1);
     expect((await call("GET", "/api/me", { headers: { cookie: expired } })).status).toBe(401);
   });

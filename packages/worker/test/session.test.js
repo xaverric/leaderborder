@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { parseCookies, serializeCookie } from "../src/cookies.js";
 import { signValue, verifyValue } from "../src/session.js";
 
-const secret = "s3cret";
+const secret = "s3cret-0123456789abcdef0123456789abcdef";
 
 const flip = (s, i) => s.slice(0, i) + (s[i] === "A" ? "B" : "A") + s.slice(i + 1);
 
@@ -30,7 +30,7 @@ describe("signValue / verifyValue", () => {
 
   it("rejects a different secret", async () => {
     const signed = await signValue({ uid: 7, exp: 2000 }, secret);
-    expect(await verifyValue(signed, "other", 1000)).toBeNull();
+    expect(await verifyValue(signed, "other-secret-0123456789abcdef01234567", 1000)).toBeNull();
   });
 
   it("rejects an expired payload", async () => {

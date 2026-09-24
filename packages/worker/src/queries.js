@@ -1,14 +1,31 @@
 export const toUser = (row) => ({ login: row.login, name: row.name ?? row.login, avatarUrl: row.avatar_url ?? null });
 
-export const upsertUser = (db, { githubId, login, name, avatarUrl }, nowIso) =>
-  db
-    .prepare(
-      `INSERT INTO users (github_id, login, name, avatar_url, created_at) VALUES (?1, ?2, ?3, ?4, ?5)
-       ON CONFLICT (github_id) DO UPDATE SET login = excluded.login, name = excluded.name, avatar_url = excluded.avatar_url
-       RETURNING id, login, name, avatar_url`,
-    )
-    .bind(githubId, login, name, avatarUrl, nowIso)
-    .first();
+export const upsertUser = async (db, { githubId, login, name, avatarUrl }, nowIso) => {
+  const [, inserted] = await db.batch([
+    db.prepare("UPDATE users SET login = login || '#' || github_id WHERE login = ?1 COLLATE NOCASE AND github_id != ?2").bind(login, githubId),
+    db
+      .prepare(
+        `INSERT INTO users (github_id, login, name, avatar_url, created_at) VALUES (?1, ?2, ?3, ?4, ?5)
+         ON CONFLICT (github_id) DO UPDATE SET login = excluded.login, name = excluded.name, avatar_url = excluded.avatar_url
+         RETURNING id, login, name, avatar_url, blocked_at`,
+      )
+      .bind(githubId, login, name, avatarUrl, nowIso),
+  ]);
+  return inserted.results[0];
+};
+
+export const deleteUser = (db, id) => db.prepare("DELETE FROM users WHERE id = ?1").bind(id).run();
+
+export const countActiveDevices = async (db, userId) =>
+  (await db.prepare("SELECT COUNT(*) AS n FROM devices WHERE user_id = ?1 AND revoked_at IS NULL").bind(userId).first()).n;
+
+export const usageCardinality = async (db, deviceId) => {
+  const [pairs, total] = await db.batch([
+    db.prepare("SELECT DISTINCT client, model FROM usage_daily WHERE device_id = ?1").bind(deviceId),
+    db.prepare("SELECT COUNT(*) AS n FROM usage_daily WHERE device_id = ?1").bind(deviceId),
+  ]);
+  return { pairs: pairs.results.map((r) => `${r.client}\u0000${r.model}`), total: total.results[0].n };
+};
 
 export const getUserById = (db, id) => db.prepare("SELECT id, login, name, avatar_url FROM users WHERE id = ?1").bind(id).first();
 
@@ -17,7 +34,7 @@ export const getUserByLogin = (db, login) =>
 
 export const getDevice = (db, id) => db.prepare("SELECT id, user_id, revoked_at FROM devices WHERE id = ?1").bind(id).first();
 
-export const registerDevice = (db, { deviceId, userId, name, tokenHash, nowIso }) =>
+export const registerDevice = (db, { deviceId, userId, name, tokenHash, nowIso, accessPolicy = "", expiresAt }) =>
   db.batch([
     db
       .prepare(
@@ -25,22 +42,26 @@ export const registerDevice = (db, { deviceId, userId, name, tokenHash, nowIso }
          ON CONFLICT (id) DO UPDATE SET name = excluded.name, revoked_at = NULL WHERE devices.user_id = excluded.user_id`,
       )
       .bind(deviceId, userId, name, nowIso),
-    db.prepare("UPDATE api_tokens SET revoked_at = ?1 WHERE device_id = ?2 AND revoked_at IS NULL").bind(nowIso, deviceId),
-    db.prepare("INSERT INTO api_tokens (device_id, token_hash, created_at) VALUES (?1, ?2, ?3)").bind(deviceId, tokenHash, nowIso),
+    db.prepare("UPDATE api_tokens SET revoked_at = ?1 WHERE device_id = ?2 AND revoked_at IS NULL AND EXISTS (SELECT 1 FROM devices WHERE id = ?2 AND user_id = ?3)").bind(nowIso, deviceId, userId),
+    db.prepare("INSERT INTO api_tokens (device_id, token_hash, created_at, access_policy, expires_at) SELECT id, ?2, ?3, ?4, ?6 FROM devices WHERE id = ?1 AND user_id = ?5")
+      .bind(deviceId, tokenHash, nowIso, accessPolicy, userId, expiresAt ?? null),
   ]);
 
-export const findTokenAuth = (db, tokenHash) =>
+export const findTokenAuth = (db, tokenHash, nowIso) =>
   db
     .prepare(
-      `SELECT t.id AS token_id, t.token_hash, d.id AS device_id, u.id, u.login, u.name, u.avatar_url
+      `SELECT t.id AS token_id, t.token_hash, t.access_policy, d.id AS device_id, u.id, u.login, u.name, u.avatar_url
        FROM api_tokens t JOIN devices d ON d.id = t.device_id JOIN users u ON u.id = d.user_id
-       WHERE t.token_hash = ?1 AND t.revoked_at IS NULL AND d.revoked_at IS NULL`,
+       WHERE t.token_hash = ?1 AND t.revoked_at IS NULL AND d.revoked_at IS NULL AND u.blocked_at IS NULL
+         AND (t.expires_at IS NULL OR t.expires_at > ?2)`,
     )
-    .bind(tokenHash)
+    .bind(tokenHash, nowIso)
     .first();
 
 const UPSERT_USAGE = `INSERT INTO usage_daily (device_id, day, client, model, input, output, cache_read, cache_write, reasoning, cost_usd, messages, updated_at)
-  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+  SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12
+  WHERE EXISTS (SELECT 1 FROM api_tokens t JOIN devices d ON d.id = t.device_id
+    WHERE t.id = ?13 AND t.device_id = ?1 AND t.revoked_at IS NULL AND d.revoked_at IS NULL)
   ON CONFLICT (device_id, day, client, model) DO UPDATE SET
     input = excluded.input, output = excluded.output, cache_read = excluded.cache_read, cache_write = excluded.cache_write,
     reasoning = excluded.reasoning, cost_usd = excluded.cost_usd, messages = excluded.messages, updated_at = excluded.updated_at`;
@@ -49,10 +70,10 @@ export const upsertUsage = (db, { deviceId, tokenId, rows, nowIso }) => {
   const upsert = db.prepare(UPSERT_USAGE);
   return db.batch([
     ...rows.map((r) =>
-      upsert.bind(deviceId, r.day, r.client, r.model, r.input, r.output, r.cacheRead, r.cacheWrite, r.reasoning, r.costUsd, r.messages, nowIso),
+      upsert.bind(deviceId, r.day, r.client, r.model, r.input, r.output, r.cacheRead, r.cacheWrite, r.reasoning, r.costUsd, r.messages, nowIso, tokenId),
     ),
-    db.prepare("UPDATE devices SET last_sync_at = ?1 WHERE id = ?2").bind(nowIso, deviceId),
-    db.prepare("UPDATE api_tokens SET last_used_at = ?1 WHERE id = ?2").bind(nowIso, tokenId),
+    db.prepare("UPDATE devices SET last_sync_at = ?1 WHERE id = ?2 AND revoked_at IS NULL AND EXISTS (SELECT 1 FROM api_tokens WHERE id = ?3 AND device_id = ?2 AND revoked_at IS NULL)").bind(nowIso, deviceId, tokenId),
+    db.prepare("UPDATE api_tokens SET last_used_at = ?1 WHERE id = ?2 AND revoked_at IS NULL").bind(nowIso, tokenId),
   ]);
 };
 
@@ -71,8 +92,8 @@ const USAGE_JOIN = "FROM usage_daily ud JOIN devices d ON d.id = ud.device_id JO
 
 const FILTERED = "ud.day BETWEEN ?1 AND ?2 AND (?3 IS NULL OR ud.client = ?3) AND (?4 IS NULL OR ud.model = ?4)";
 
-const TOTAL_COLUMNS = `SUM(ud.input + ud.output + ud.cache_read + ud.cache_write) AS tokens,
-  SUM(ud.input + ud.output) AS tokens_nocache, SUM(ud.cost_usd) AS cost_usd`;
+const TOTAL_COLUMNS = `TOTAL(ud.input + ud.output + ud.cache_read + ud.cache_write) AS tokens,
+  TOTAL(ud.input + ud.output) AS tokens_nocache, TOTAL(ud.cost_usd) AS cost_usd`;
 
 const all = async (statement) => (await statement.all()).results;
 
@@ -88,19 +109,21 @@ export const leaderboardTotals = (db, { start, end, client, model }) =>
 export const leaderboardByClient = (db, { start, end, client, model, metricSql }) =>
   all(
     db
-      .prepare(`SELECT d.user_id, ud.client, SUM(${metricSql}) AS value ${USAGE_JOIN} WHERE ${FILTERED} GROUP BY d.user_id, ud.client ORDER BY ud.client`)
+      .prepare(`SELECT d.user_id, ud.client, TOTAL(${metricSql}) AS value ${USAGE_JOIN} WHERE ${FILTERED} GROUP BY d.user_id, ud.client ORDER BY ud.client`)
       .bind(start, end, client, model),
   );
 
 export const leaderboardDaily = (db, { start, end, client, model, metricSql }) =>
   all(
     db
-      .prepare(`SELECT d.user_id, ud.day, SUM(${metricSql}) AS value ${USAGE_JOIN} WHERE ${FILTERED} GROUP BY d.user_id, ud.day`)
+      .prepare(`SELECT d.user_id, ud.day, TOTAL(${metricSql}) AS value ${USAGE_JOIN} WHERE ${FILTERED} GROUP BY d.user_id, ud.day`)
       .bind(start, end, client, model),
   );
 
+export const MAX_FILTER_VALUES = 500;
+
 export const distinctValues = async (db, column) =>
-  (await all(db.prepare(`SELECT DISTINCT ${column} AS value FROM usage_daily ORDER BY ${column}`))).map((r) => r.value);
+  (await all(db.prepare(`SELECT DISTINCT ${column} AS value FROM usage_daily ORDER BY ${column} LIMIT ?1`).bind(MAX_FILTER_VALUES))).map((r) => r.value);
 
 export const listDevices = (db, userId) =>
   all(
@@ -123,7 +146,7 @@ export const revokeDevice = async (db, { userId, deviceId, nowIso }) => {
 
 export const userTotals = (db, userId) =>
   db
-    .prepare(`SELECT ${TOTAL_COLUMNS}, SUM(ud.messages) AS messages, COUNT(DISTINCT ud.day) AS active_days ${USAGE_JOIN} WHERE u.id = ?1`)
+    .prepare(`SELECT ${TOTAL_COLUMNS}, TOTAL(ud.messages) AS messages, COUNT(DISTINCT ud.day) AS active_days ${USAGE_JOIN} WHERE u.id = ?1`)
     .bind(userId)
     .first();
 
@@ -141,28 +164,30 @@ export const publicTotals = (db, { start, end }) =>
   db
     .prepare(
       `SELECT
-        (SELECT COALESCE(SUM(input + output + cache_read + cache_write), 0) FROM usage_daily) AS tokens_all_time,
-        (SELECT COALESCE(SUM(input + output + cache_read + cache_write), 0) FROM usage_daily WHERE day BETWEEN ?1 AND ?2) AS tokens_week,
-        (SELECT COALESCE(SUM(cost_usd), 0) FROM usage_daily WHERE day BETWEEN ?1 AND ?2) AS cost_week,
+        (SELECT COALESCE(TOTAL(input + output + cache_read + cache_write), 0) FROM usage_daily) AS tokens_all_time,
+        (SELECT COALESCE(TOTAL(input + output + cache_read + cache_write), 0) FROM usage_daily WHERE day BETWEEN ?1 AND ?2) AS tokens_week,
+        (SELECT COALESCE(TOTAL(cost_usd), 0) FROM usage_daily WHERE day BETWEEN ?1 AND ?2) AS cost_week,
         (SELECT COUNT(*) FROM users) AS players,
         (SELECT COUNT(DISTINCT d.user_id) FROM usage_daily ud JOIN devices d ON d.id = ud.device_id WHERE ud.day BETWEEN ?1 AND ?2) AS active_week`,
     )
     .bind(start, end)
     .first();
 
-export const topBy = (db, column, { start, end, limit = 5 }) =>
+export const topBy = (db, column, { start, end, limit = 5, minUsers = 1 }) =>
   all(
     db
       .prepare(
-        `SELECT ${column} AS value, SUM(input + output + cache_read + cache_write) AS tokens FROM usage_daily
-         WHERE day BETWEEN ?1 AND ?2 GROUP BY ${column} ORDER BY tokens DESC, ${column} LIMIT ?3`,
+        `SELECT ud.${column} AS value, TOTAL(ud.input + ud.output + ud.cache_read + ud.cache_write) AS tokens
+         FROM usage_daily ud JOIN devices d ON d.id = ud.device_id
+         WHERE ud.day BETWEEN ?1 AND ?2 GROUP BY ud.${column} HAVING COUNT(DISTINCT d.user_id) >= ?4
+         ORDER BY tokens DESC, value LIMIT ?3`,
       )
-      .bind(start, end, limit),
+      .bind(start, end, limit, minUsers),
   );
 
 export const dailyTokens = (db, { start, end }) =>
   all(
     db
-      .prepare("SELECT day, SUM(input + output + cache_read + cache_write) AS tokens FROM usage_daily WHERE day BETWEEN ?1 AND ?2 GROUP BY day")
+      .prepare("SELECT day, TOTAL(input + output + cache_read + cache_write) AS tokens FROM usage_daily WHERE day BETWEEN ?1 AND ?2 GROUP BY day")
       .bind(start, end),
   );

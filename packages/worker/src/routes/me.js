@@ -1,8 +1,10 @@
-import { assertSameOrigin, requireAnyUser, requireCookieUser } from "../auth.js";
+import { assertSameOrigin, requireAnyUser, requireBearer, requireCookieUser } from "../auth.js";
+import { cookieName, isLocalApp, serializeCookie } from "../cookies.js";
 import { HttpError, json, noContent } from "../http.js";
 import { toRankedTotals } from "../metrics.js";
 import { periodRange } from "../periods.js";
-import { leaderboardTotals, listDevices, revokeDevice, toUser } from "../queries.js";
+import { deleteUser, leaderboardTotals, listDevices, revokeDevice, toUser } from "../queries.js";
+import { SESSION_COOKIE } from "../session.js";
 import { leaderboardTz } from "./leaderboard.js";
 
 const toDevice = (row) => ({ id: row.id, name: row.name, createdAt: row.created_at, lastSyncAt: row.last_sync_at ?? null });
@@ -19,7 +21,22 @@ export const getMe = async ({ request, env, now }) => {
   return json({ user: toUser(user), rank, devices: devices.map(toDevice) });
 };
 
+export const deleteMe = async ({ request, env, now }) => {
+  const user = await requireCookieUser(request, env, now);
+  assertSameOrigin(request);
+  await deleteUser(env.DB, user.id);
+  const cleared = serializeCookie(cookieName(SESSION_COOKIE, env), "", { maxAge: 0, path: "/", httpOnly: true, secure: !isLocalApp(env), sameSite: "Lax" });
+  return noContent(new Headers({ "set-cookie": cleared }));
+};
+
+const revokeSelf = async ({ request, env, now }) => {
+  const auth = await requireBearer(request, env, now);
+  await revokeDevice(env.DB, { userId: auth.id, deviceId: auth.device_id, nowIso: now.toISOString() });
+  return noContent();
+};
+
 export const deleteMyDevice = async ({ request, env, params, now }) => {
+  if (params.id === "self") return revokeSelf({ request, env, now });
   const user = await requireCookieUser(request, env, now);
   assertSameOrigin(request);
   const revoked = await revokeDevice(env.DB, { userId: user.id, deviceId: params.id.toLowerCase(), nowIso: now.toISOString() });
