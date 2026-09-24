@@ -1,0 +1,8 @@
+{
+  "date": "2026-09-24",
+  "framework": "vanilla HTML + CSS + ES modules served as Cloudflare Workers static assets (packages/worker/public)",
+  "fonts": "Geist + Geist Mono via Google Fonts link in index.html and app.html",
+  "palette": "OKLCH custom properties in packages/worker/public/css/tokens.css (Contract 6 names, shared with the Electron app)",
+  "motion": "motion-cut (no motion library); uPlot 1.6 vendored for time series",
+  "spacing": "--space-3xs..--space-4xl rem scale in tokens.css"
+}

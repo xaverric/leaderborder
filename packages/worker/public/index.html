@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>leaderborder</title>
+    <meta name="description" content="A menubar app that turns your local Claude Code, Codex and Cursor usage into a shared token leaderboard." />
+    <meta name="theme-color" content="#f9fafc" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0d1017" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300..700&family=Geist+Mono:wght@400..600&display=swap" />
+    <link rel="stylesheet" href="/css/tokens.css" />
+    <link rel="stylesheet" href="/css/base.css" />
+    <link rel="stylesheet" href="/css/landing.css" />
+    <script type="module" src="/js/landing.js"></script>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+
+    <nav class="nav-pill" aria-label="Primary">
+      <a class="wordmark" href="/">
+        <svg class="wordmark__mark" viewBox="0 0 18 18" aria-hidden="true"><rect x="1" y="9" width="4" height="8" rx="1" /><rect x="7" y="5" width="4" height="12" rx="1" /><rect x="13" y="1" width="4" height="16" rx="1" /></svg>
+        leaderborder
+      </a>
+      <ul class="nav-pill__links">
+        <li><a href="#how">How it works</a></li>
+        <li><a href="#install">Install</a></li>
+        <li><a href="#privacy">Privacy</a></li>
+      </ul>
+      <a class="btn btn--ink btn--sm" data-signin href="/auth/github?next=/app">Sign in</a>
+    </nav>
+
+    <main id="main">
+      <section class="hero wrap" aria-labelledby="hero-title">
+        <div class="hero__grid">
+          <div class="hero__figure-block">
+            <p class="hero__figure" data-stat="tokensThisWeek" data-format="compact" aria-describedby="hero-title">
+              <span class="skeleton hero__skeleton"></span>
+            </p>
+            <p class="hero__exact tnum" data-stat-exact>
+              <span class="skeleton skeleton--long"></span>
+            </p>
+            <p class="hero__updated" data-stat-updated></p>
+          </div>
+          <div class="hero__words">
+            <h1 id="hero-title" class="hero__title">Tokens burned this week. Find your rank.</h1>
+            <p class="hero__lead">leaderborder reads the usage logs Claude Code, Codex, Cursor and friends already keep on your Mac, and puts everyone on one board.</p>
+            <div class="hero__actions">
+              <a class="btn btn--accent" data-signin href="/auth/github?next=/app">
+                <svg class="btn__icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z" /></svg>
+                Sign in with GitHub
+              </a>
+              <a class="btn" href="#install">Install on macOS</a>
+            </div>
+          </div>
+        </div>
+
+        <dl class="stat-strip" aria-label="Board totals">
+          <div class="stat">
+            <dt>All-time tokens</dt>
+            <dd class="tnum" data-stat="tokensAllTime" data-format="compact"><span class="skeleton"></span></dd>
+          </div>
+          <div class="stat">
+            <dt>Players</dt>
+            <dd class="tnum" data-stat="players" data-format="integer"><span class="skeleton"></span></dd>
+          </div>
+          <div class="stat">
+            <dt>Active this week</dt>
+            <dd class="tnum" data-stat="activeThisWeek" data-format="integer"><span class="skeleton"></span></dd>
+          </div>
+          <div class="stat">
+            <dt>Cost this week <span class="stat__note">API-equivalent</span></dt>
+            <dd class="tnum" data-stat="costThisWeekUsd" data-format="usd"><span class="skeleton"></span></dd>
+          </div>
+        </dl>
+
+        <figure class="activity card" aria-labelledby="activity-title">
+          <div class="activity__head">
+            <h2 id="activity-title" class="activity__title">Last 90 days, everyone combined</h2>
+            <p class="activity__total muted tnum" data-activity-total></p>
+          </div>
+          <div class="activity__grid">
+            <div class="activity__body" data-activity>
+              <div class="activity__skeleton" aria-hidden="true"></div>
+            </div>
+            <dl class="activity__facts">
+              <div class="fact">
+                <dt>Busiest day</dt>
+                <dd><span class="fact__value tnum" data-fact="busiest"><span class="skeleton"></span></span><span class="fact__note muted" data-fact="busiestDay"></span></dd>
+              </div>
+              <div class="fact">
+                <dt>Average day</dt>
+                <dd><span class="fact__value tnum" data-fact="average"><span class="skeleton"></span></span><span class="fact__note muted">tokens, all players</span></dd>
+              </div>
+              <div class="fact">
+                <dt>Active days</dt>
+                <dd><span class="fact__value tnum" data-fact="activeDays"><span class="skeleton"></span></span><span class="fact__note muted">of the last 90</span></dd>
+              </div>
+            </dl>
+          </div>
+        </figure>
+        <p class="stats-status muted" data-stats-status role="status"></p>
+      </section>
+
+      <section id="how" class="section wrap" aria-labelledby="how-title">
+        <div class="section__head">
+          <h2 id="how-title" class="section__title">From your Mac to the board in four steps.</h2>
+          <p class="section__lead">No proxy, no API keys, no browser extension. The numbers come from files your tools already write.</p>
+        </div>
+        <ol class="steps">
+          <li class="step">
+            <span class="step__n tnum">1</span>
+            <h3 class="step__title">Run the menubar app</h3>
+            <p>One command starts it. It lives in the menubar, launches at login and syncs every hour.</p>
+          </li>
+          <li class="step">
+            <span class="step__n tnum">2</span>
+            <h3 class="step__title">Collect locally</h3>
+            <p>The bundled open-source tokscale engine reads each tool's local usage logs and prices them. This step never touches the network with your data.</p>
+          </li>
+          <li class="step">
+            <span class="step__n tnum">3</span>
+            <h3 class="step__title">Send daily aggregates</h3>
+            <p>One row per day, tool and model: token counts and API-equivalent cost. Nothing else.</p>
+          </li>
+          <li class="step">
+            <span class="step__n tnum">4</span>
+            <h3 class="step__title">Climb the board</h3>
+            <p>Sign in with GitHub to see where you rank today, this week or all time, and open anyone's stats.</p>
+          </li>
+        </ol>
+      </section>
+
+      <section id="tools" class="section wrap" aria-labelledby="tools-title">
+        <div class="section__head">
+          <h2 id="tools-title" class="section__title">Works with the tools you already use.</h2>
+          <p class="section__lead">Each tool keeps its own local logs. leaderborder reads them all and ranks the total.</p>
+        </div>
+        <div class="tools">
+          <div class="tools__list card">
+            <div class="tools__cols" aria-hidden="true">
+              <span>Tool</span>
+              <span>Share of this week</span>
+            </div>
+            <ul class="tool-rows" data-tools>
+              <li class="tool-row" data-client="claude"><span class="tool-row__name">Claude Code</span><span class="tool-row__share"></span></li>
+              <li class="tool-row" data-client="codex"><span class="tool-row__name">Codex</span><span class="tool-row__share"></span></li>
+              <li class="tool-row" data-client="cursor"><span class="tool-row__name">Cursor</span><span class="tool-row__share"></span></li>
+              <li class="tool-row" data-client="gemini"><span class="tool-row__name">Gemini CLI</span><span class="tool-row__share"></span></li>
+              <li class="tool-row" data-client="copilot"><span class="tool-row__name">GitHub Copilot CLI</span><span class="tool-row__share"></span></li>
+              <li class="tool-row" data-client="opencode"><span class="tool-row__name">OpenCode</span><span class="tool-row__share"></span></li>
+              <li class="tool-row" data-client="amp"><span class="tool-row__name">Amp</span><span class="tool-row__share"></span></li>
+            </ul>
+          </div>
+          <div class="models card">
+            <h3 class="models__title">Most-used models this week</h3>
+            <ol class="models__list" data-models>
+              <li class="models__row"><span class="skeleton skeleton--mid"></span></li>
+              <li class="models__row"><span class="skeleton skeleton--mid"></span></li>
+              <li class="models__row"><span class="skeleton skeleton--mid"></span></li>
+            </ol>
+          </div>
+        </div>
+      </section>
+
+      <section id="install" class="section wrap" aria-labelledby="install-title">
+        <div class="install">
+          <div class="install__intro">
+            <h2 id="install-title" class="section__title">Install in one line.</h2>
+            <p class="section__lead">macOS on Apple silicon or Intel. The npm route needs Node 22 or newer.</p>
+          </div>
+          <div class="install__primary card">
+            <div class="code-line code-line--hero">
+              <code>npx leaderborder</code>
+              <button class="btn btn--sm copy-btn" type="button" data-copy="npx leaderborder">Copy</button>
+            </div>
+            <p class="install__caption">Starts the menubar app and walks you through GitHub sign-in.</p>
+          </div>
+          <ul class="install__alts">
+            <li class="install__alt">
+              <span class="install__label">Global npm</span>
+              <div class="code-line">
+                <code>npm i -g leaderborder</code>
+                <button class="btn btn--sm copy-btn" type="button" data-copy="npm i -g leaderborder">Copy</button>
+              </div>
+            </li>
+            <li class="install__alt">
+              <span class="install__label">Homebrew CLI</span>
+              <div class="code-line">
+                <code>brew install xaverric/<wbr>tap/<wbr>leaderborder</code>
+                <button class="btn btn--sm copy-btn" type="button" data-copy="brew install xaverric/tap/leaderborder">Copy</button>
+              </div>
+            </li>
+            <li class="install__alt">
+              <span class="install__label">Homebrew app</span>
+              <div class="code-line">
+                <code>brew install --cask xaverric/<wbr>tap/<wbr>leaderborder</code>
+                <button class="btn btn--sm copy-btn" type="button" data-copy="brew install --cask xaverric/tap/leaderborder">Copy</button>
+              </div>
+            </li>
+            <li class="install__alt install__alt--dmg">
+              <span class="install__label">Disk image</span>
+              <div class="install__dmg">
+                <a class="btn btn--sm" href="https://github.com/xaverric/leaderborder/releases/latest">Download the DMG</a>
+                <p class="install__note">The app is not signed yet. On first launch, right click it in Applications and choose Open.</p>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="privacy" class="section wrap" aria-labelledby="privacy-title">
+        <div class="section__head">
+          <h2 id="privacy-title" class="section__title">Counts leave your Mac. Your work does not.</h2>
+          <p class="section__lead">Usage is collected by the open-source <a href="https://github.com/junhoyeo/tokscale">tokscale</a> engine running locally. leaderborder uploads only the aggregates below.</p>
+        </div>
+        <div class="privacy">
+          <div class="privacy__col card">
+            <h3 class="privacy__title"><span class="privacy__mark privacy__mark--yes" aria-hidden="true"></span>Sent, per day, tool and model</h3>
+            <ul class="privacy__list">
+              <li>Input, output, cache read and cache write token counts</li>
+              <li>Reasoning tokens and message count</li>
+              <li>API-equivalent cost in USD</li>
+              <li>The tool and model names</li>
+              <li>Your GitHub login, name and avatar, and the device name you pick</li>
+            </ul>
+          </div>
+          <div class="privacy__col card">
+            <h3 class="privacy__title"><span class="privacy__mark privacy__mark--no" aria-hidden="true"></span>Never sent</h3>
+            <ul class="privacy__list">
+              <li>Prompts or model responses</li>
+              <li>Code, diffs or file contents</li>
+              <li>File paths</li>
+              <li>Project or repository names</li>
+              <li>Session ids</li>
+            </ul>
+          </div>
+        </div>
+        <div class="privacy__check">
+          <p>Check it yourself. This prints every row before anything is uploaded:</p>
+          <div class="code-line">
+            <code>leaderborder sync --dry-run</code>
+            <button class="btn btn--sm copy-btn" type="button" data-copy="leaderborder sync --dry-run">Copy</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="cta wrap" aria-labelledby="cta-title">
+        <div class="cta__inner card">
+          <h2 id="cta-title" class="cta__title">See where you rank.</h2>
+          <p class="cta__lead">Sign-in uses GitHub and asks for your public profile and organization membership.</p>
+          <a class="btn btn--accent" data-signin href="/auth/github?next=/app">Sign in with GitHub</a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="wrap foot-stmt">
+      <p class="foot-stmt__line">Every token counts. Only the counts leave.</p>
+      <div class="foot-stmt__meta">
+        <span class="wordmark">leaderborder</span>
+        <ul class="foot-stmt__links">
+          <li><a href="https://github.com/xaverric/leaderborder">Source on GitHub</a></li>
+          <li><a href="https://github.com/xaverric/leaderborder/blob/main/LICENSE">MIT license</a></li>
+          <li><a href="https://github.com/junhoyeo/tokscale">tokscale engine</a></li>
+        </ul>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,23 @@
+[
+  {
+    "date": "2026-09-24",
+    "macrostructure": "Stat-Led",
+    "theme": "custom",
+    "theme_axes": "light / geometric-sans / cool-blue",
+    "vibe": "clean instrument panel, one blue signal",
+    "genre": "modern-minimal",
+    "nav": "N5 Floating pill",
+    "footer": "Ft5 Statement",
+    "enrichment": "none",
+    "palette": {
+      "paper": "oklch(98.6% 0.003 255)",
+      "ink": "oklch(19% 0.018 262)",
+      "accent": "oklch(56% 0.2 260)",
+      "paperDark": "oklch(15.5% 0.008 262)",
+      "inkDark": "oklch(96% 0.005 255)",
+      "accentDark": "oklch(68% 0.17 258)"
+    },
+    "fonts": { "display": "Geist 600", "body": "Geist 400", "mono": "Geist Mono" },
+    "brief": "leaderborder - landing with live weekly tokens + logged-in leaderboard app; redirected from Bloom (too orange) to a blue modern-minimal custom theme"
+  }
+]

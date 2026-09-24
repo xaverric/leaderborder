@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Leaderboard - leaderborder</title>
+    <meta name="description" content="See where you rank and explore token usage across Claude Code, Codex, Cursor and more." />
+    <meta name="theme-color" content="#f9fafc" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0d1017" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300..700&family=Geist+Mono:wght@400..600&display=swap" />
+    <link rel="stylesheet" href="/css/tokens.css" />
+    <link rel="stylesheet" href="/css/base.css" />
+    <link rel="stylesheet" href="/vendor/uPlot.min.css" />
+    <link rel="stylesheet" href="/css/app.css" />
+    <script type="module" src="/js/app.js"></script>
+  </head>
+  <body class="app">
+    <a class="skip" href="#view">Skip to content</a>
+
+    <header class="app-bar">
+      <nav class="nav-pill app-bar__pill" aria-label="App">
+        <a class="wordmark" href="/" aria-label="leaderborder home">
+          <svg class="wordmark__mark" viewBox="0 0 18 18" aria-hidden="true"><rect x="1" y="9" width="4" height="8" rx="1" /><rect x="7" y="5" width="4" height="12" rx="1" /><rect x="13" y="1" width="4" height="16" rx="1" /></svg>
+          <span class="wordmark__text">leaderborder</span>
+        </a>
+        <ul class="app-nav" data-nav hidden>
+          <li><a data-route="leaderboard" href="#/">Board</a></li>
+          <li><a data-route="devices" href="#/devices">Devices</a></li>
+        </ul>
+        <details class="me-menu" data-me hidden>
+          <summary class="me-menu__trigger" aria-label="Account">
+            <img class="avatar avatar--sm" data-me-avatar alt="" width="28" height="28" />
+          </summary>
+          <div class="me-menu__panel card">
+            <p class="me-menu__who"><strong data-me-name></strong><span class="muted" data-me-login></span></p>
+            <a class="me-menu__item" data-route="self" href="#/">Your stats</a>
+            <a class="me-menu__item" data-route="devices" href="#/devices">Your devices</a>
+            <button class="me-menu__item" type="button" data-signout>Sign out</button>
+          </div>
+        </details>
+      </nav>
+    </header>
+
+    <main id="view" class="view wrap" tabindex="-1">
+      <div class="view-loading" aria-hidden="true">
+        <span class="skeleton skeleton--title"></span>
+        <span class="skeleton skeleton--block"></span>
+      </div>
+    </main>
+  </body>
+</html>
