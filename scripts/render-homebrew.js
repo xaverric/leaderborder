@@ -7,8 +7,7 @@ import { parseArgs } from "node:util";
 
 const DEFAULT_REPO = "xaverric/leaderborder";
 const TEMPLATE_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "packaging", "homebrew");
-// eslint-disable-next-line security/detect-unsafe-regex
-const SEMVER = /^\d{1,9}\.\d{1,9}\.\d{1,9}(?:-[0-9A-Za-z.-]{1,64})?$/;
+const SEMVER = [/^\d{1,9}\.\d{1,9}\.\d{1,9}$/, /^\d{1,9}\.\d{1,9}\.\d{1,9}-[0-9A-Za-z.-]{1,64}$/];
 const SHA256_HEX = /^[0-9a-f]{64}$/;
 const REPO = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 
@@ -29,8 +28,10 @@ export const dmgFileName = (version, arch) => `Leaderborder-${version}-${arch}.d
 
 export const tarballFileName = (version) => `leaderborder-${version}.tgz`;
 
+const matches = (patterns, value) => [patterns].flat().some((pattern) => pattern.test(String(value)));
+
 const check = (value, pattern, label) => {
-  if (!pattern.test(String(value))) throw new Error(`Invalid ${label}: ${value}`);
+  if (!matches(pattern, value)) throw new Error(`Invalid ${label}: ${value}`);
   return value;
 };
 
@@ -66,7 +67,7 @@ const parseCli = (argv) => {
   });
   const missing = ["version", "tarball", "dmg-arm64", "dmg-x64", "out"].filter((key) => !values[key]);
   if (missing.length) throw new UsageError(`Missing --${missing.join(", --")}`);
-  if (!SEMVER.test(values.version)) throw new UsageError(`Invalid --version: ${values.version}`);
+  if (!matches(SEMVER, values.version)) throw new UsageError(`Invalid --version: ${values.version}`);
   return values;
 };
 

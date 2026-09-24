@@ -76,7 +76,7 @@ gh secret set CLOUDFLARE_API_TOKEN --env production --repo xaverric/leaderborder
 gh secret set CLOUDFLARE_ACCOUNT_ID --env production --repo xaverric/leaderborder
 ```
 
-The Release workflow calls `deploy.yml` with `secrets: inherit`; the secrets are resolved inside the called workflow's `production` job. Without them the deploy job succeeds with a "Deploy skipped" notice. A manual run of **Deploy worker** (`workflow_dispatch`) deploys only from `main`.
+The Release workflow calls `deploy.yml` without passing any secrets; the `production` environment secrets are resolved inside the called workflow's deploy job. Without them the deploy job succeeds with a "Deploy skipped" notice. A manual run of **Deploy worker** (`workflow_dispatch`) deploys only from `main`.
 
 Worker runtime secrets are separate and set once with wrangler (from `packages/worker`):
 
