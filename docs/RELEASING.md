@@ -32,15 +32,10 @@ What the Release workflow produces (assets of the GitHub Release `vX.Y.Z`):
 
 ### Homebrew tap
 
+Done: the tap lives at https://github.com/xaverric/homebrew-tap, cloned to `~/Documents/personal/homebrew-tap`. On a new machine:
+
 ```sh
-gh repo create xaverric/homebrew-tap --public --description "Homebrew tap for leaderborder"
-git clone git@github.com:xaverric/homebrew-tap.git ~/src/homebrew-tap
-cd ~/src/homebrew-tap
-mkdir -p Formula Casks
-printf '# xaverric/tap\n\n    brew install xaverric/tap/leaderborder\n    brew install --cask xaverric/tap/leaderborder\n' > README.md
-git add README.md
-git commit -m "Initial tap"
-git push -u origin main
+git clone https://github.com/xaverric/homebrew-tap.git ~/Documents/personal/homebrew-tap
 ```
 
 ### Cloudflare API token for the Worker deploy
@@ -183,7 +178,7 @@ npx leaderborder@X.Y.Z --version
 ### Publish to the Homebrew tap
 
 ```sh
-cd ~/src/homebrew-tap
+cd ~/Documents/personal/homebrew-tap
 git pull --ff-only
 cp ~/Downloads/leaderborder-X.Y.Z/leaderborder.rb Formula/leaderborder.rb
 cp ~/Downloads/leaderborder-X.Y.Z/leaderborder-cask.rb Casks/leaderborder.rb
@@ -228,7 +223,7 @@ curl -fsS https://leaderborder.xaverric.cz/api/public/stats
 - **Homebrew tap:** revert the release commit, users then get the previous formula and cask:
 
   ```sh
-  cd ~/src/homebrew-tap
+  cd ~/Documents/personal/homebrew-tap
   git revert --no-edit HEAD
   git push
   ```
