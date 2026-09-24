@@ -19,6 +19,14 @@ const ERROR_COPY = {
   not_logged_in: "You are signed out. Sign in again.",
 };
 
+const GITHUB_LOGIN_COPY = {
+  device_flow_disabled: "GitHub sign-in is not available: Device Flow is disabled for the leaderborder GitHub app.",
+  expired_token: "The GitHub code expired before it was confirmed. Sign in again.",
+  access_denied: "GitHub sign-in was denied. Sign in again to retry.",
+};
+
+const GITHUB_LOGIN_GENERIC = "GitHub sign-in failed. Try again.";
+
 const GENERIC_ERROR = "Something went wrong. Run leaderborder status in a terminal for details.";
 const WARNING_COPY = "Cursor sync skipped";
 
@@ -52,7 +60,8 @@ export const relativeTime = (iso, now) => {
   return `${Math.floor(diff / DAY)} d ago`;
 };
 
-export const errorMessage = (error) => ERROR_COPY[error?.code] ?? GENERIC_ERROR;
+export const errorMessage = (error) =>
+  error?.code === "github_login" ? GITHUB_LOGIN_COPY[error.reason] ?? GITHUB_LOGIN_GENERIC : ERROR_COPY[error?.code] ?? GENERIC_ERROR;
 
 export const normalizeDeviceCode = (arg) => ({
   userCode: arg?.userCode ?? arg?.user_code ?? null,

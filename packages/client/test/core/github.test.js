@@ -59,18 +59,18 @@ test("device flow polls through pending and slow_down and returns the token", as
   assert.equal(params.get("grant_type"), "urn:ietf:params:oauth:grant-type:device_code");
 });
 
-test("device flow rejects expired_token as unauthorized", async () => {
-  await assert.rejects(run([{ error: "expired_token" }]).promise, (e) => e.code === "unauthorized" && /expired/i.test(e.message));
+test("device flow rejects expired_token as a GitHub login failure", async () => {
+  await assert.rejects(run([{ error: "expired_token" }]).promise, (e) => e.code === "github_login" && /expired/i.test(e.message));
 });
 
-test("device flow rejects access_denied as unauthorized", async () => {
-  await assert.rejects(run([{ error: "access_denied" }]).promise, (e) => e.code === "unauthorized" && /denied/i.test(e.message));
+test("device flow rejects access_denied as a GitHub login failure", async () => {
+  await assert.rejects(run([{ error: "access_denied" }]).promise, (e) => e.code === "github_login" && /denied/i.test(e.message));
 });
 
 test("device flow rejects unknown errors with the GitHub description", async () => {
   await assert.rejects(
-    run([{ error: "device_flow_disabled", error_description: "Device Flow must be enabled" }]).promise,
-    (e) => e.code === "unauthorized" && /Device Flow must be enabled/.test(e.message),
+    run([{ error: "unexpected_error", error_description: "Something odd happened" }]).promise,
+    (e) => e.code === "github_login" && /Something odd happened/.test(e.message),
   );
 });
 
@@ -82,6 +82,15 @@ test("device flow rejects a failed code request", async () => {
   const fetch = fakeFetch([new Response("nope", { status: 404 })]);
   await assert.rejects(
     githubDeviceFlow({ clientId: "bad", fetch, onCode: () => {}, sleep: async () => {} }),
-    (e) => e.code === "unauthorized",
+    (e) => e.code === "github_login" && /HTTP 404/.test(e.message),
+  );
+});
+
+test("device flow explains a disabled Device Flow reported with HTTP 400", async () => {
+  const body = JSON.stringify({ error: "device_flow_disabled", error_description: "Device Flow must be explicitly enabled for this App" });
+  const fetch = fakeFetch([new Response(body, { status: 400, headers: { "content-type": "application/json" } })]);
+  await assert.rejects(
+    githubDeviceFlow({ clientId: "cid", fetch, onCode: () => {}, sleep: async () => {} }),
+    (e) => e.code === "github_login" && e.reason === "device_flow_disabled" && /Device Flow is disabled/.test(e.message),
   );
 });
