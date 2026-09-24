@@ -24,4 +24,35 @@ export const isAllowed = ({ login, orgs }, env) => {
   return loginAllowed(login, env) || orgs.some((org) => allowedOrgs.includes(org.toLowerCase()));
 };
 
-export const githubScope = (env) => (needsOrgs(env) ? "read:org" : "");
+
+const GITHUB_ID = /^[1-9][0-9]{0,15}$/;
+
+export const adminIds = (env) =>
+  (env.ADMIN_GITHUB_IDS ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => GITHUB_ID.test(item))
+    .map(Number);
+
+export const isAdmin = (githubId, env) => Number.isSafeInteger(githubId) && adminIds(env).includes(githubId);
+
+export const EMPTY_RULES = Object.freeze({ public: false, logins: [], orgs: [] });
+
+export const rulesAllow = ({ login, orgs = [] }, rules) =>
+  rules.public || rules.logins.includes(login.toLowerCase()) || orgs.some((org) => rules.orgs.includes(org.toLowerCase()));
+
+export const grantsAccess = (user, env, rules = EMPTY_RULES) =>
+  isAdmin(user.githubId, env) || rulesAllow(user, rules) || isAllowed({ login: user.login, orgs: user.orgs ?? [] }, env);
+
+export const needsOrgLookup = (env, rules = EMPTY_RULES) => needsOrgs(env) || rules.orgs.length > 0;
+
+export const parseOrgs = (text) => {
+  try {
+    const value = JSON.parse(text ?? "[]");
+    return Array.isArray(value) ? value.filter((org) => typeof org === "string") : [];
+  } catch {
+    return [];
+  }
+};
+
+export const githubScope = (env, rules = EMPTY_RULES) => (needsOrgLookup(env, rules) ? "read:org" : "");

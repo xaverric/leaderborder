@@ -62,10 +62,15 @@ const mockRequest = async (method, path) => {
   return body;
 };
 
-const networkRequest = async (method, path) => {
+const requestInit = (method, payload) =>
+  payload === undefined
+    ? { method, credentials: "same-origin", headers: { accept: "application/json" } }
+    : { method, credentials: "same-origin", headers: { accept: "application/json", "content-type": "application/json" }, body: JSON.stringify(payload) };
+
+const networkRequest = async (method, path, payload) => {
   let response;
   try {
-    response = await fetch(path, { method, credentials: "same-origin", headers: { accept: "application/json" } });
+    response = await fetch(path, requestInit(method, payload));
   } catch {
     throw new ApiError(0, "network", "Could not reach leaderborder. Check your connection and try again.");
   }
@@ -77,11 +82,12 @@ const networkRequest = async (method, path) => {
   return body;
 };
 
-const request = (method, path) => (isMock() ? mockRequest(method, path) : networkRequest(method, path));
+const request = (method, path, payload) => (isMock() ? mockRequest(method, path) : networkRequest(method, path, payload));
 
 export const api = {
   get: (path) => request("GET", path),
-  post: (path) => request("POST", path),
+  post: (path, payload) => request("POST", path, payload),
+  put: (path, payload) => request("PUT", path, payload),
   del: (path) => request("DELETE", path),
 };
 

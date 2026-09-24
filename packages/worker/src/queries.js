@@ -30,7 +30,7 @@ export const usageCardinality = async (db, deviceId) => {
 export const getUserById = (db, id) => db.prepare("SELECT id, login, name, avatar_url FROM users WHERE id = ?1").bind(id).first();
 
 export const getUserByLogin = (db, login) =>
-  db.prepare("SELECT id, login, name, avatar_url FROM users WHERE login = ?1 COLLATE NOCASE ORDER BY id LIMIT 1").bind(login).first();
+  db.prepare("SELECT id, github_id, login, name, avatar_url FROM users WHERE login = ?1 COLLATE NOCASE ORDER BY id LIMIT 1").bind(login).first();
 
 export const getDevice = (db, id) => db.prepare("SELECT id, user_id, revoked_at FROM devices WHERE id = ?1").bind(id).first();
 
@@ -50,7 +50,7 @@ export const registerDevice = (db, { deviceId, userId, name, tokenHash, nowIso, 
 export const findTokenAuth = (db, tokenHash, nowIso) =>
   db
     .prepare(
-      `SELECT t.id AS token_id, t.token_hash, t.access_policy, d.id AS device_id, u.id, u.login, u.name, u.avatar_url
+      `SELECT t.id AS token_id, t.token_hash, t.access_policy, d.id AS device_id, u.id, u.github_id, u.login, u.name, u.avatar_url, u.orgs
        FROM api_tokens t JOIN devices d ON d.id = t.device_id JOIN users u ON u.id = d.user_id
        WHERE t.token_hash = ?1 AND t.revoked_at IS NULL AND d.revoked_at IS NULL AND u.blocked_at IS NULL
          AND (t.expires_at IS NULL OR t.expires_at > ?2)`,
@@ -90,7 +90,7 @@ export const upsertDevUser = async (db, login, nowIso) =>
 
 const USAGE_JOIN = "FROM usage_daily ud JOIN devices d ON d.id = ud.device_id JOIN users u ON u.id = d.user_id";
 
-const FILTERED = "ud.day BETWEEN ?1 AND ?2 AND (?3 IS NULL OR ud.client = ?3) AND (?4 IS NULL OR ud.model = ?4)";
+const FILTERED = "u.blocked_at IS NULL AND ud.day BETWEEN ?1 AND ?2 AND (?3 IS NULL OR ud.client = ?3) AND (?4 IS NULL OR ud.model = ?4)";
 
 const TOTAL_COLUMNS = `TOTAL(ud.input + ud.output + ud.cache_read + ud.cache_write) AS tokens,
   TOTAL(ud.input + ud.output) AS tokens_nocache, TOTAL(ud.cost_usd) AS cost_usd`;

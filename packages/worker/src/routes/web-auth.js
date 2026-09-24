@@ -1,4 +1,5 @@
 import { githubScope } from "../access.js";
+import { addRule, clearAccessRequest, loadRules, recordAccessRequest, saveUserOrgs } from "../access-store.js";
 import { assertSameOrigin } from "../auth.js";
 import { cookieName, isLocalApp, parseCookies, serializeCookie } from "../cookies.js";
 import { base64urlEncode, utf8 } from "../encoding.js";
@@ -31,7 +32,7 @@ export const startGithubLogin = async ({ env, url, now }) => {
   const signed = await signValue({ typ: "state", state, next, verifier, exp: nowSeconds(now) + STATE_MAX_AGE }, env.SESSION_SECRET);
   const authorize = new URL("https://github.com/login/oauth/authorize");
   const params = { client_id: env.GITHUB_CLIENT_ID, redirect_uri: callbackUrl(env), state, code_challenge: challenge, code_challenge_method: "S256" };
-  const scope = githubScope(env);
+  const scope = githubScope(env, await loadRules(env.DB));
   authorize.search = new URLSearchParams(scope ? { ...params, scope } : params).toString();
   return redirect(authorize.href, [cookie(env, STATE_COOKIE, signed, { maxAge: STATE_MAX_AGE })]);
 };
@@ -53,11 +54,14 @@ export const finishGithubLogin = async ({ request, env, url, now }) => {
   const access = token ? await githubAccess(token, env) : null;
   if (!access) return loginFailed(env);
   if (!access.allowed) {
-    const page = htmlPage(403, "Not allowed", "This GitHub account is not allowed to join this leaderboard.");
+    await recordAccessRequest(env.DB, access.profile, now.toISOString());
+    const page = htmlPage(403, "Access requested", "This GitHub account is not on the leaderboard yet. Your request was sent to the admin; sign in again once it is approved.");
     page.headers.append("set-cookie", clearStateCookie(env));
     return page;
   }
   const user = await upsertUser(env.DB, access.profile, now.toISOString());
+  if (access.orgs) await saveUserOrgs(env.DB, user.id, access.orgs);
+  await clearAccessRequest(env.DB, access.profile.githubId);
   if (user.blocked_at) {
     const page = htmlPage(403, "Not allowed", "This GitHub account is blocked on this leaderboard.");
     page.headers.append("set-cookie", clearStateCookie(env));
@@ -81,6 +85,7 @@ export const devLogin = async ({ env, url, now }) => {
   const login = url.searchParams.get("login") ?? "";
   if (!isGithubLogin(login)) throw new HttpError(400, "invalid_request", "login: invalid GitHub login");
   const user = await upsertDevUser(env.DB, login, now.toISOString());
+  await addRule(env.DB, { kind: "login", value: login, nowIso: now.toISOString(), createdBy: "dev" });
   return redirect(safeNext(url.searchParams.get("next") ?? undefined), [await sessionCookie(env, user.id, now)]);
 };
 

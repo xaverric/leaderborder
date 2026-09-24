@@ -35,7 +35,4 @@ enabled = true
 [vars]
 APP_URL = "https://leaderborder.xaverric.cz"
 GITHUB_CLIENT_ID = "Ov23liGpxnsqRCLTD8Pr"
-ALLOWED_GITHUB_ORGS = ""
-ALLOWED_GITHUB_LOGINS = "xaverric"
-PUBLIC_ACCESS = ""
 LEADERBOARD_TZ = "Europe/Prague"

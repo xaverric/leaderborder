@@ -1,4 +1,5 @@
-import { isAllowed, loginAllowed, needsOrgs } from "./access.js";
+import { grantsAccess, isAdmin, isAllowed, loginAllowed, needsOrgLookup, rulesAllow } from "./access.js";
+import { loadRules } from "./access-store.js";
 import { HttpError } from "./http.js";
 import { isGithubLogin } from "./validate.js";
 
@@ -58,10 +59,14 @@ export const getGithubOrgs = async (token) => {
   throw new HttpError(503, "unavailable", "GitHub organization lookup exceeded its limit");
 };
 
-export const resolveGithubAccess = async (token, env) => {
+const allowedWithoutOrgs = ({ githubId, login }, env, rules) =>
+  isAdmin(githubId, env) || rulesAllow({ login, orgs: [] }, rules) || loginAllowed(login, env) || isAllowed({ login, orgs: [] }, env);
+
+export const resolveGithubAccess = async (token, env, rules) => {
+  const current = rules ?? (await loadRules(env.DB));
   const profile = await getGithubUser(token, env);
-  const orgs = needsOrgs(env) && !loginAllowed(profile.login, env) ? await getGithubOrgs(token) : [];
-  return { profile, allowed: isAllowed({ login: profile.login, orgs }, env) };
+  const orgs = needsOrgLookup(env, current) && !allowedWithoutOrgs(profile, env, current) ? await getGithubOrgs(token) : null;
+  return { profile, orgs, allowed: grantsAccess({ githubId: profile.githubId, login: profile.login, orgs: orgs ?? [] }, env, current) };
 };
 
 export const exchangeCode = async ({ code, verifier, redirectUri, env }) => {

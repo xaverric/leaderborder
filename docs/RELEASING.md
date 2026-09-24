@@ -89,13 +89,15 @@ openssl rand -base64 32 | npx wrangler secret put SESSION_SECRET
 
 ### Who can sign in
 
-Access is deny-by-default. `ALLOWED_GITHUB_LOGINS` and `ALLOWED_GITHUB_ORGS` in `packages/worker/wrangler.toml` list the GitHub logins and organizations that may sign in; with both empty nobody can. A fully public leaderboard needs an explicit `PUBLIC_ACCESS = "1"`. Changing the lists signs everyone out, because web sessions and device tokens are bound to the access policy. Device tokens expire after 90 days and web sessions after 7 days, users then sign in again.
-
-Block a single user (web and device access stop immediately), from `packages/worker`:
+Access is deny-by-default and lives in D1, not in the code. Set the admins once as a Worker secret with their numeric GitHub user ids (comma separated); without it nobody is admin. Ids are immutable, so a renamed login cannot be taken over:
 
 ```sh
-npx wrangler d1 execute leaderborder --remote --command "UPDATE users SET blocked_at = datetime('now') WHERE login = '<login>'"
+cd packages/worker
+gh api user --jq .id                      # your own id, or: curl -s https://api.github.com/users/<login> | jq .id
+echo "<id>" | npx wrangler secret put ADMIN_GITHUB_IDS
 ```
+
+Everything else is done on https://leaderborder.xaverric.cz/app/admin: approve or deny access requests, allow GitHub logins or organizations, toggle "Open to everyone", block or unblock users. Changes apply on the next request, no redeploy. Device tokens expire after 90 days and web sessions after 7 days, users then sign in again.
 
 Users can delete their account and all its data themselves on the Devices page of the web app or with `DELETE /api/me`.
 
