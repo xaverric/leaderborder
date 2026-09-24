@@ -3,6 +3,7 @@ import { isLocalApp } from "./cookies.js";
 import { HttpError, errorResponse, readJsonBody, redirect, toErrorResponse, withSecurityHeaders } from "./http.js";
 import { createRouter } from "./router.js";
 import { limitRequest } from "./rate-limit.js";
+import { deleteAdminRule, getAdminOverview, postAdminRule, postApproveRequest, postBlockUser, postDenyRequest, postUnblockUser, putAdminSettings } from "./routes/admin.js";
 import { isAppPath, serveApp } from "./routes/app.js";
 import { getConfig } from "./routes/config.js";
 import { postDevice } from "./routes/devices.js";
@@ -23,6 +24,14 @@ const routes = [
   { method: "GET", path: "/api/leaderboard", handler: getLeaderboard },
   { method: "GET", path: "/api/users/:login", handler: getUserDetail },
   { method: "GET", path: "/api/public/stats", handler: getPublicStats },
+  { method: "GET", path: "/api/admin/overview", handler: getAdminOverview },
+  { method: "POST", path: "/api/admin/rules", handler: postAdminRule, body: true },
+  { method: "DELETE", path: "/api/admin/rules/:id", handler: deleteAdminRule },
+  { method: "POST", path: "/api/admin/requests/:login/approve", handler: postApproveRequest },
+  { method: "POST", path: "/api/admin/requests/:login/deny", handler: postDenyRequest },
+  { method: "POST", path: "/api/admin/users/:login/block", handler: postBlockUser },
+  { method: "POST", path: "/api/admin/users/:login/unblock", handler: postUnblockUser },
+  { method: "PUT", path: "/api/admin/settings", handler: putAdminSettings, body: true },
   { method: "GET", path: "/auth/github", handler: startGithubLogin },
   { method: "GET", path: "/auth/github/callback", handler: finishGithubLogin },
   { method: "GET", path: "/auth/dev", handler: devLogin },

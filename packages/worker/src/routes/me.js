@@ -1,3 +1,4 @@
+import { isAdmin } from "../access.js";
 import { assertSameOrigin, requireAnyUser, requireBearer, requireCookieUser } from "../auth.js";
 import { cookieName, isLocalApp, serializeCookie } from "../cookies.js";
 import { HttpError, json, noContent } from "../http.js";
@@ -18,7 +19,7 @@ const weeklyRank = async (db, userId, now, tz) => {
 export const getMe = async ({ request, env, now }) => {
   const user = await requireAnyUser(request, env, now);
   const [rank, devices] = await Promise.all([weeklyRank(env.DB, user.id, now, leaderboardTz(env)), listDevices(env.DB, user.id)]);
-  return json({ user: toUser(user), rank, devices: devices.map(toDevice) });
+  return json({ user: toUser(user), isAdmin: isAdmin(user.login, env), rank, devices: devices.map(toDevice) });
 };
 
 export const deleteMe = async ({ request, env, now }) => {

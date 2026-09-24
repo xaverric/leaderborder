@@ -1,4 +1,5 @@
-import { accessPolicy } from "./access.js";
+import { accessPolicy, grantsAccess, parseOrgs } from "./access.js";
+import { loadRules } from "./access-store.js";
 import { cookieName, parseCookies } from "./cookies.js";
 import { HttpError } from "./http.js";
 import { findTokenAuth } from "./queries.js";
@@ -7,10 +8,13 @@ import { hashToken, isDeviceTokenFormat } from "./tokens.js";
 
 const unauthorized = () => new HttpError(401, "unauthorized", "Authentication required");
 
+const stillAllowed = async (user, env) =>
+  user && grantsAccess({ login: user.login, orgs: parseOrgs(user.orgs) }, env, await loadRules(env.DB)) ? user : null;
+
 export const sessionUser = async (request, env, now) => {
   const cookie = parseCookies(request.headers.get("cookie"))[cookieName(SESSION_COOKIE, env)];
   const payload = await verifyValue(cookie, env.SESSION_SECRET, Math.floor(now.getTime() / 1000), "session");
-  return findSessionUser(env, payload, Math.floor(now.getTime() / 1000));
+  return stillAllowed(await findSessionUser(env, payload, Math.floor(now.getTime() / 1000)), env);
 };
 
 const bearerToken = (request) => request.headers.get("authorization")?.match(/^Bearer (\S+)$/)?.[1];
@@ -21,7 +25,7 @@ export const bearerAuth = async (request, env, now) => {
   const token = bearerToken(request);
   if (!isDeviceTokenFormat(token)) return null;
   const auth = await findTokenAuth(env.DB, await hashToken(token), now.toISOString());
-  return auth?.access_policy === accessPolicy(env) ? auth : null;
+  return auth?.access_policy === accessPolicy(env) ? stillAllowed(auth, env) : null;
 };
 
 export const requireCookieUser = async (request, env, now) => {

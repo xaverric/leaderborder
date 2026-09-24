@@ -8,6 +8,8 @@ describe("parseRoute", () => {
     ["/app/u/ada", "", { name: "user", login: "ada" }],
     ["/app/u/ada-lovelace/", "", { name: "user", login: "ada-lovelace" }],
     ["/app/devices", "", { name: "devices" }],
+    ["/app/admin", "", { name: "admin" }],
+    ["/app.html", "#/admin", { name: "admin" }],
     ["/app/nope", "", { name: "not_found" }],
     ["/app/u/bad%20login", "", { name: "not_found" }],
     ["/app.html", "", { name: "leaderboard" }],
