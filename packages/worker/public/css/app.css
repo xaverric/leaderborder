@@ -1147,6 +1147,46 @@
   font-size: var(--text-sm);
 }
 
+.danger-zone {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md) var(--space-lg);
+  margin-top: var(--space-lg);
+  padding: var(--space-md) var(--space-lg);
+  border-color: color-mix(in srgb, var(--color-negative) 30%, var(--color-rule));
+}
+
+.danger-zone__text {
+  display: grid;
+  gap: var(--space-3xs);
+  flex: 1 1 18rem;
+  min-width: 0;
+}
+
+.danger-zone__title {
+  font-size: var(--text-md);
+  font-weight: var(--weight-strong);
+  line-height: var(--lh-snug);
+}
+
+.danger-zone__desc {
+  max-width: 52ch;
+  font-size: var(--text-sm);
+}
+
+.danger-zone .btn--danger {
+  border-color: color-mix(in srgb, var(--color-negative) 45%, var(--color-rule));
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .danger-zone .btn--danger:hover {
+    border-color: var(--color-negative);
+    background: color-mix(in srgb, var(--color-negative) 8%, var(--color-card));
+  }
+}
+
 .empty[hidden] {
   display: none;
 }

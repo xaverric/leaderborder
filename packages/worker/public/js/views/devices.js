@@ -97,8 +97,12 @@ export const renderDevices = (view, ctx) => {
       h(
         "section",
         { class: "card danger-zone" },
-        h("h2", { class: "danger-zone__title" }, "Delete account"),
-        h("p", { class: "muted" }, "Removes your profile, every device token and all usage you uploaded. Historical leaderboards will no longer include you."),
+        h(
+          "div",
+          { class: "danger-zone__text" },
+          h("h2", { class: "danger-zone__title" }, "Delete account"),
+          h("p", { class: "danger-zone__desc muted" }, "Removes your profile, every device token and all usage you uploaded. Historical leaderboards will no longer include you."),
+        ),
         h("button", { class: "btn btn--sm btn--danger", type: "button", onclick: deleteAccount }, "Delete my account and data"),
       ),
     ),
