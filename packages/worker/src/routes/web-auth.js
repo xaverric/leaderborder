@@ -26,7 +26,7 @@ const sessionCookie = async (env, userId, now) =>
 const clearStateCookie = (env) => cookie(env, STATE_COOKIE, "", { maxAge: 0, path: "/auth" });
 
 export const startGithubLogin = async ({ env, url, now }) => {
-  if (!env.GITHUB_CLIENT_ID) throw new HttpError(500, "internal", "GitHub login is not configured");
+  if (!env.GITHUB_CLIENT_ID || !env.GITHUB_CLIENT_SECRET) throw new HttpError(500, "internal", "GitHub login is not configured");
   const state = base64urlEncode(crypto.getRandomValues(new Uint8Array(24)));
   const next = safeNext(url.searchParams.get("next") ?? undefined);
   const signed = await signValue({ state, next, exp: nowSeconds(now) + STATE_MAX_AGE }, env.SESSION_SECRET);
