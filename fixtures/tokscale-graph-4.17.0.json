@@ -1,0 +1,196 @@
+{
+  "meta": {
+    "generatedAt": "2026-09-24T10:42:22.389778+00:00",
+    "version": "4.17.0",
+    "dateRange": {
+      "start": "2026-09-10",
+      "end": "2026-09-12"
+    }
+  },
+  "summary": {
+    "totalTokens": 3092516631,
+    "totalCost": 3073.261385800001,
+    "totalDays": 15,
+    "activeDays": 15,
+    "averagePerDay": 204.88409238666674,
+    "maxCostInSingleDay": 559.8815743499996,
+    "clients": [
+      "claude",
+      "codex"
+    ],
+    "models": [
+      "claude-opus-5",
+      "claude-fable-5-1",
+      "gpt-6-astra"
+    ]
+  },
+  "years": [],
+  "contributions": [
+    {
+      "date": "2026-09-10",
+      "totals": {
+        "tokens": 327787433,
+        "cost": 470.2622962499996,
+        "messages": 2036
+      },
+      "intensity": 4,
+      "tokenBreakdown": {
+        "input": 9117176,
+        "output": 1053489,
+        "cacheRead": 314831876,
+        "cacheWrite": 2784892,
+        "reasoning": 518918
+      },
+      "clients": [
+        {
+          "client": "claude",
+          "modelId": "claude-opus-5",
+          "providerId": "anthropic",
+          "tokens": {
+            "input": 278,
+            "output": 116872,
+            "cacheRead": 53082074,
+            "cacheWrite": 1875943,
+            "reasoning": 0
+          },
+          "cost": 41.18887074999999,
+          "messages": 139
+        },
+        {
+          "client": "claude",
+          "modelId": "claude-fable-5-1",
+          "providerId": "anthropic",
+          "tokens": {
+            "input": 1654,
+            "output": 135698,
+            "cacheRead": 11309452,
+            "cacheWrite": 908909,
+            "reasoning": 0
+          },
+          "cost": 20.9901655,
+          "messages": 62
+        },
+        {
+          "client": "codex",
+          "modelId": "gpt-6-astra",
+          "providerId": "openai",
+          "tokens": {
+            "input": 9115234,
+            "output": 800899,
+            "cacheRead": 250440320,
+            "cacheWrite": 0,
+            "reasoning": 518913
+          },
+          "cost": 407.58325999999965,
+          "messages": 1834
+        },
+        {
+          "client": "claude",
+          "modelId": "claude-opus-5",
+          "providerId": "openrouter",
+          "tokens": {
+            "input": 10,
+            "output": 20,
+            "cacheRead": 30,
+            "cacheWrite": 40,
+            "reasoning": 5
+          },
+          "cost": 0.5,
+          "messages": 1
+        }
+      ]
+    },
+    {
+      "date": "2026-09-11",
+      "totals": {
+        "tokens": 95111007,
+        "cost": 121.64093100000004,
+        "messages": 631
+      },
+      "intensity": 1,
+      "tokenBreakdown": {
+        "input": 3018439,
+        "output": 322627,
+        "cacheRead": 91204862,
+        "cacheWrite": 565079,
+        "reasoning": 77589
+      },
+      "clients": [
+        {
+          "client": "claude",
+          "modelId": "claude-opus-5",
+          "providerId": "anthropic",
+          "tokens": {
+            "input": 232,
+            "output": 74117,
+            "cacheRead": 19700300,
+            "cacheWrite": 201856,
+            "reasoning": 0
+          },
+          "cost": 12.965835000000002,
+          "messages": 116
+        },
+        {
+          "client": "codex",
+          "modelId": "gpt-6-astra",
+          "providerId": "openai",
+          "tokens": {
+            "input": 3015825,
+            "output": 127915,
+            "cacheRead": 53028864,
+            "cacheWrite": 0,
+            "reasoning": 77589
+          },
+          "cost": 93.46231400000003,
+          "messages": 434
+        },
+        {
+          "client": "claude",
+          "modelId": "claude-fable-5-1",
+          "providerId": "anthropic",
+          "tokens": {
+            "input": 2382,
+            "output": 120595,
+            "cacheRead": 18475698,
+            "cacheWrite": 363223,
+            "reasoning": 0
+          },
+          "cost": 15.212781999999999,
+          "messages": 81
+        }
+      ]
+    },
+    {
+      "date": "2026-09-12",
+      "totals": {
+        "tokens": 2124026,
+        "cost": 7.300034000000002,
+        "messages": 12
+      },
+      "intensity": 1,
+      "tokenBreakdown": {
+        "input": 518624,
+        "output": 5658,
+        "cacheRead": 1599744,
+        "cacheWrite": 0,
+        "reasoning": 4623
+      },
+      "clients": [
+        {
+          "client": "codex",
+          "modelId": "gpt-6-astra",
+          "providerId": "openai",
+          "tokens": {
+            "input": 518624,
+            "output": 5658,
+            "cacheRead": 1599744,
+            "cacheWrite": 0,
+            "reasoning": 4623
+          },
+          "cost": 7.300034000000002,
+          "messages": 12
+        }
+      ]
+    }
+  ]
+}

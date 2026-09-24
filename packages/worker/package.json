@@ -1,0 +1,20 @@
+{
+  "name": "@leaderborder/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "vitest run",
+    "vendor": "node scripts/vendor.js"
+  },
+  "devDependencies": {
+    "wrangler": "^4.138.0",
+    "vitest": "4.1.11",
+    "@cloudflare/vitest-pool-workers": "^0.22.0",
+    "uplot": "^1.6.32",
+    "@vitest/runner": "4.1.11",
+    "@vitest/snapshot": "4.1.11"
+  }
+}

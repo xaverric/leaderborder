@@ -1,0 +1,38 @@
+{
+  "name": "leaderborder",
+  "version": "0.1.0",
+  "description": "Track AI coding token usage across Claude Code, Codex, Cursor and more, and compete on a leaderboard.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xaverric/leaderborder.git",
+    "directory": "packages/client"
+  },
+  "homepage": "https://leaderborder.xaverric.cz",
+  "bin": {
+    "leaderborder": "./src/cli/bin.js"
+  },
+  "main": "./src/app/main.js",
+  "files": [
+    "src",
+    "assets"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test \"test/**/*.test.js\"",
+    "start": "electron .",
+    "build:app": "electron-builder --mac --config electron-builder.yml",
+    "compat:tokscale": "node test/compat/tokscale-compat.js"
+  },
+  "dependencies": {
+    "@tokscale/cli": "4.17.0",
+    "electron": "^44.4.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "electron-builder": "^26.15.3"
+  }
+}

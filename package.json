@@ -1,0 +1,27 @@
+{
+  "name": "leaderborder-monorepo",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/client",
+    "packages/worker"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "test": "npm run test:scripts && npm run test -w leaderborder && npm run test -w @leaderborder/worker",
+    "test:client": "npm run test -w leaderborder",
+    "test:worker": "npm run test -w @leaderborder/worker",
+    "build:app": "npm run build:app -w leaderborder --",
+    "compat:tokscale": "npm run compat:tokscale -w leaderborder",
+    "dev:worker": "npm run dev -w @leaderborder/worker",
+    "test:scripts": "node --test \"scripts/*.test.js\""
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.11.0",
+    "globals": "^17.12.0"
+  }
+}
