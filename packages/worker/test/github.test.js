@@ -27,6 +27,7 @@ describe("resolveGithubAccess", () => {
     const result = await resolveGithubAccess("gho_x", env());
     expect(result).toEqual({
       profile: { githubId: 42, login: "ada", name: "Ada Lovelace", avatarUrl: "https://avatars.githubusercontent.com/u/42" },
+      orgs: null,
       allowed: true,
     });
     expect(spy).toHaveBeenCalledTimes(1);

@@ -24,6 +24,7 @@ describe("GET /api/me", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
       user: { login: "ada", name: "Ada", avatarUrl: "https://avatars.githubusercontent.com/u/1" },
+      isAdmin: false,
       rank: null,
       devices: [{ id: ada.deviceId, name: "Ada Mac", createdAt: expect.any(String), lastSyncAt: null }],
     });

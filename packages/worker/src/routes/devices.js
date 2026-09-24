@@ -1,4 +1,5 @@
 import { accessPolicy } from "../access.js";
+import { clearAccessRequest, recordAccessRequest, saveUserOrgs } from "../access-store.js";
 import { resolveGithubAccess } from "../github.js";
 import { HttpError, json } from "../http.js";
 import { countActiveDevices, getDevice, registerDevice, toUser, upsertUser } from "../queries.js";
@@ -12,12 +13,17 @@ export const TOKEN_TTL_MS = 90 * 86400000;
 export const postDevice = async ({ env, body, now }) => {
   const invalid = validateDeviceBody(body);
   if (invalid) throw new HttpError(400, "invalid_request", invalid);
-  const { profile, allowed } = await resolveGithubAccess(body.githubToken, env);
-  if (!allowed) throw new HttpError(403, "forbidden", "GitHub account is not allowed");
+  const { profile, orgs, allowed } = await resolveGithubAccess(body.githubToken, env);
+  if (!allowed) {
+    await recordAccessRequest(env.DB, profile, now.toISOString());
+    throw new HttpError(403, "forbidden", "GitHub account is not on the leaderboard yet, access requested from the admin");
+  }
   await enforceLimit(env.AUTH_LIMITER, `github:${profile.githubId}`, env);
   const nowIso = now.toISOString();
   const user = await upsertUser(env.DB, profile, nowIso);
   if (user.blocked_at) throw new HttpError(403, "forbidden", "GitHub account is blocked");
+  if (orgs) await saveUserOrgs(env.DB, user.id, orgs);
+  await clearAccessRequest(env.DB, profile.githubId);
   const deviceId = body.deviceId.toLowerCase();
   const existing = await getDevice(env.DB, deviceId);
   if (existing && existing.user_id !== user.id) throw new HttpError(403, "forbidden", "Device belongs to another user");
