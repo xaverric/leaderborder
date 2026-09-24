@@ -2,13 +2,14 @@ import { isAdmin } from "../access.js";
 import { addRule, adminOverview, approveRequest, deleteRule, denyRequest, setBlocked, setPublicAccess, toRule } from "../access-store.js";
 import { assertSameOrigin, requireCookieUser } from "../auth.js";
 import { HttpError, json, noContent } from "../http.js";
+import { getUserByLogin } from "../queries.js";
 import { isGithubLogin } from "../validate.js";
 
 const RULE_KINDS = new Set(["login", "org"]);
 
 const requireAdmin = async (context) => {
   const user = await requireCookieUser(context.request, context.env, context.now);
-  if (!isAdmin(user.login, context.env)) throw new HttpError(403, "forbidden", "Admin only");
+  if (!isAdmin(user.github_id, context.env)) throw new HttpError(403, "forbidden", "Admin only");
   return user;
 };
 
@@ -62,7 +63,9 @@ export const postDenyRequest = async (context) => {
 const blockHandler = (blocked) => async (context) => {
   await requireAdminChange(context);
   const login = loginParam(context.params.login);
-  if (blocked && isAdmin(login, context.env)) throw new HttpError(400, "invalid_request", "The admin cannot be blocked");
+  const target = await getUserByLogin(context.env.DB, login);
+  if (!target) throw notFound("User");
+  if (blocked && isAdmin(target.github_id, context.env)) throw new HttpError(400, "invalid_request", "The admin cannot be blocked");
   if (!(await setBlocked(context.env.DB, { login, blocked, nowIso: context.now.toISOString() }))) throw notFound("User");
   return noContent();
 };

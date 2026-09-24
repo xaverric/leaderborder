@@ -51,24 +51,33 @@ beforeEach(async () => {
 afterEach(() => vi.restoreAllMocks());
 
 describe("access rules", () => {
-  it("reads admins from the ADMIN_GITHUB_LOGINS secret, case-insensitively", () => {
-    const secret = { ADMIN_GITHUB_LOGINS: "xaverric, Grace" };
-    expect(isAdmin("XaverRic", secret)).toBe(true);
-    expect(isAdmin("grace", secret)).toBe(true);
-    expect(isAdmin("ada", secret)).toBe(false);
-    expect(isAdmin("xaverric", {})).toBe(false);
+  it("reads admins by immutable GitHub user id from the ADMIN_GITHUB_IDS secret", () => {
+    const secret = { ADMIN_GITHUB_IDS: "99, 7" };
+    expect(isAdmin(99, secret)).toBe(true);
+    expect(isAdmin(7, secret)).toBe(true);
+    expect(isAdmin(1, secret)).toBe(false);
+    expect(isAdmin(undefined, secret)).toBe(false);
+    expect(isAdmin(99, { ADMIN_GITHUB_IDS: "99x" })).toBe(false);
+    expect(isAdmin(99, {})).toBe(false);
+  });
+
+  it("does not make someone admin who took over the admin's login name", async () => {
+    const impostor = githubUser(555, ADMIN_LOGIN);
+    const cookie = await cookieFor((await addUser(impostor)).id);
+    expect((await request("GET", "/api/admin/overview", cookie)).status).toBe(401);
   });
 
   it("has no admin when the secret is missing", async () => {
     const cookie = await as(admin);
-    const response = await call("GET", "/api/admin/overview", { headers: { cookie }, env: { ...CLOSED, ADMIN_GITHUB_LOGINS: undefined } });
+    const response = await call("GET", "/api/admin/overview", { headers: { cookie }, env: { ...CLOSED, ADMIN_GITHUB_IDS: undefined } });
     expect(response.status).toBe(401);
   });
 
   it("grants access through the admin, database rules or the env fallback", () => {
-    const closed = { PUBLIC_ACCESS: "", ADMIN_GITHUB_LOGINS: "xaverric" };
+    const closed = { PUBLIC_ACCESS: "", ADMIN_GITHUB_IDS: "99" };
     const none = { public: false, logins: [], orgs: [] };
-    expect(grantsAccess({ login: "xaverric", orgs: [] }, closed, none)).toBe(true);
+    expect(grantsAccess({ githubId: 99, login: "xaverric", orgs: [] }, closed, none)).toBe(true);
+    expect(grantsAccess({ githubId: 555, login: "xaverric", orgs: [] }, closed, none)).toBe(false);
     expect(grantsAccess({ login: "ada", orgs: [] }, closed, none)).toBe(false);
     expect(grantsAccess({ login: "Ada", orgs: [] }, closed, { ...none, logins: ["ada"] })).toBe(true);
     expect(grantsAccess({ login: "ada", orgs: ["ACME"] }, closed, { ...none, orgs: ["acme"] })).toBe(true);

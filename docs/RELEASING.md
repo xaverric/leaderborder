@@ -89,11 +89,12 @@ openssl rand -base64 32 | npx wrangler secret put SESSION_SECRET
 
 ### Who can sign in
 
-Access is deny-by-default and lives in D1, not in the code. Set the admins once as a Worker secret (comma separated GitHub logins); without it nobody is admin:
+Access is deny-by-default and lives in D1, not in the code. Set the admins once as a Worker secret with their numeric GitHub user ids (comma separated); without it nobody is admin. Ids are immutable, so a renamed login cannot be taken over:
 
 ```sh
 cd packages/worker
-echo "xaverric" | npx wrangler secret put ADMIN_GITHUB_LOGINS
+gh api user --jq .id                      # your own id, or: curl -s https://api.github.com/users/<login> | jq .id
+echo "<id>" | npx wrangler secret put ADMIN_GITHUB_IDS
 ```
 
 Everything else is done on https://leaderborder.xaverric.cz/app/admin: approve or deny access requests, allow GitHub logins or organizations, toggle "Open to everyone", block or unblock users. Changes apply on the next request, no redeploy. Device tokens expire after 90 days and web sessions after 7 days, users then sign in again.

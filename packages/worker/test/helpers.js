@@ -25,7 +25,7 @@ export const makeEnv = (overrides = {}) => ({
   ALLOWED_GITHUB_ORGS: "",
   ALLOWED_GITHUB_LOGINS: "",
   LEADERBOARD_TZ: "Europe/Prague",
-  ADMIN_GITHUB_LOGINS: "xaverric",
+  ADMIN_GITHUB_IDS: "99",
   ...overrides,
 });
 

@@ -103,7 +103,7 @@ The public landing page shows only anonymous, rounded totals, and only once at l
 
 ### Who can sign in
 
-Access is deny-by-default and managed at runtime, without a redeploy. Admins are the GitHub logins in the Worker secret `ADMIN_GITHUB_LOGINS` (comma separated). On the Admin page of the web app they approve or deny access requests (anyone who signs in without access files one automatically), allow GitHub logins or organizations, open the board to everyone and block or unblock people. Removing a rule or blocking someone takes effect on the next request. Device tokens expire after 90 days and web sessions after 7 days, so you sign in again from time to time.
+Access is deny-by-default and managed at runtime, without a redeploy. Admins are the numeric GitHub user ids in the Worker secret `ADMIN_GITHUB_IDS` (comma separated). Ids never change or get reused, unlike logins, so renaming an account cannot hand admin rights to someone who registers the old name. On the Admin page of the web app they approve or deny access requests (anyone who signs in without access files one automatically), allow GitHub logins or organizations, open the board to everyone and block or unblock people. Removing a rule or blocking someone takes effect on the next request. Device tokens expire after 90 days and web sessions after 7 days, so you sign in again from time to time.
 
 You can delete your account and all its data on the Devices page of the web app or with `DELETE /api/me`.
 

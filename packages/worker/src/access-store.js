@@ -85,7 +85,7 @@ const toAdminUser = (env) => (row) => ({
   login: row.login,
   name: row.name ?? row.login,
   avatarUrl: row.avatar_url ?? null,
-  isAdmin: isAdmin(row.login, env),
+  isAdmin: isAdmin(row.github_id, env),
   blocked: row.blocked_at !== null,
   createdAt: row.created_at,
   devices: row.devices,
@@ -98,7 +98,7 @@ export const adminOverview = async (db, env) => {
     all(db.prepare("SELECT * FROM access_rules ORDER BY kind, value")),
     all(
       db.prepare(
-        `SELECT u.login, u.name, u.avatar_url, u.blocked_at, u.created_at,
+        `SELECT u.github_id, u.login, u.name, u.avatar_url, u.blocked_at, u.created_at,
            COUNT(d.id) FILTER (WHERE d.revoked_at IS NULL) AS devices, MAX(d.last_sync_at) AS last_sync_at
          FROM users u LEFT JOIN devices d ON d.user_id = u.id
          GROUP BY u.id ORDER BY u.login COLLATE NOCASE`,

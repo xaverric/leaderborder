@@ -61,7 +61,7 @@ export const createSession = async (env, uid, nowSec, exp = nowSec + SESSION_MAX
 
 export const findSessionUser = async (env, payload, nowSec) => {
   if (!Number.isSafeInteger(payload?.uid) || !isDeviceTokenFormat(payload?.sid)) return null;
-  return env.DB.prepare(`SELECT u.id, u.login, u.name, u.avatar_url, u.orgs FROM web_sessions s JOIN users u ON u.id = s.user_id
+  return env.DB.prepare(`SELECT u.id, u.github_id, u.login, u.name, u.avatar_url, u.orgs FROM web_sessions s JOIN users u ON u.id = s.user_id
     WHERE s.token_hash = ?1 AND s.user_id = ?2 AND s.expires_at > ?3 AND s.access_policy = ?4 AND u.blocked_at IS NULL`)
     .bind(await hashToken(payload.sid), payload.uid, nowSec, accessPolicy(env)).first();
 };

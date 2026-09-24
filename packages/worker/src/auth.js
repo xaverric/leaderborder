@@ -9,7 +9,7 @@ import { hashToken, isDeviceTokenFormat } from "./tokens.js";
 const unauthorized = () => new HttpError(401, "unauthorized", "Authentication required");
 
 const stillAllowed = async (user, env) =>
-  user && grantsAccess({ login: user.login, orgs: parseOrgs(user.orgs) }, env, await loadRules(env.DB)) ? user : null;
+  user && grantsAccess({ githubId: user.github_id, login: user.login, orgs: parseOrgs(user.orgs) }, env, await loadRules(env.DB)) ? user : null;
 
 export const sessionUser = async (request, env, now) => {
   const cookie = parseCookies(request.headers.get("cookie"))[cookieName(SESSION_COOKIE, env)];
