@@ -93,6 +93,8 @@ test("registerIpc rejects untrusted senders", async () => {
     /Untrusted sender/,
   );
   await assert.rejects(async () => registered.get("state:get")({ senderFrame: null }), /Untrusted sender/);
-  assert.deepEqual(await registered.get("state:get")({ senderFrame: { url: INDEX } }), { kind: "idle" });
+  const frame = { url: INDEX };
+  await assert.rejects(async () => registered.get("state:get")({ senderFrame: frame, sender: { mainFrame: { url: INDEX } } }), /Untrusted sender/);
+  assert.deepEqual(await registered.get("state:get")({ senderFrame: frame, sender: { mainFrame: frame } }), { kind: "idle" });
   assert.equal(calls.length, 1);
 });

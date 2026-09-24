@@ -1,6 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { formatNumber, formatUsd, formatRowsTable, formatStatus } from "../../src/cli/format.js";
+import { cleanText, formatNumber, formatUsd, formatRowsTable, formatStatus } from "../../src/cli/format.js";
+
+const ANSI = "\u001b[31mred\u001b[0m";
 
 const row = {
   day: "2026-09-24",
@@ -23,6 +25,17 @@ test("formatNumber groups thousands", () => {
 test("formatUsd prints two decimals", () => {
   assert.equal(formatUsd(1.23456), "$1.23");
   assert.equal(formatUsd(0), "$0.00");
+});
+
+test("cleanText strips control characters, coerces and truncates", () => {
+  assert.equal(cleanText(ANSI), "[31mred[0m");
+  assert.equal(cleanText("a\nb\r\tc\u0000d\u007fe\u0085f\u009bg"), "abcdefg");
+  assert.equal(cleanText("x".repeat(300)).length, 200);
+  assert.equal(cleanText("x".repeat(300), 10), "x".repeat(10));
+  assert.equal(cleanText(42), "42");
+  assert.equal(cleanText(null), "");
+  assert.equal(cleanText(undefined), "");
+  assert.equal(cleanText("Praha kancelář"), "Praha kancelář");
 });
 
 test("formatRowsTable prints a header and aligned rows", () => {
@@ -62,4 +75,22 @@ test("formatStatus describes a synced device with summary and error", () => {
   assert.match(text, /Week:\s+20,000 tokens, \$12\.50/);
   assert.match(text, /Top model:\s+claude-opus-5/);
   assert.match(text, /Last error:\s+\[network\] offline/);
+});
+
+test("formatStatus strips control characters from persisted state", () => {
+  const text = formatStatus({
+    state: {
+      deviceId: "d1",
+      deviceName: `Octo ${ANSI}\nLogged in: yes`,
+      lastSyncAt: null,
+      lastError: { code: "network\u0007", message: "offline\u001b\n\nfake line", at: "2026-09-24T11:00:00.000Z" },
+      summary: null,
+    },
+    apiUrl: "http://x",
+    hasToken: false,
+  });
+  assert.ok(!text.includes("\u001b"));
+  assert.match(text, /Device:\s+Octo \[31mred\[0mLogged in: yes \(d1\)/);
+  assert.match(text, /Last error:\s+\[network\] offlinefake line/);
+  assert.equal(text.split("\n").filter((line) => line.startsWith("Logged in:")).length, 1);
 });

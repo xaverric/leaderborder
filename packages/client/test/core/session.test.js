@@ -25,7 +25,17 @@ const graphFor = (days) => ({
   })),
 });
 
-const harness = ({ state = {}, token = TOKEN, graph = graphFor(["2026-09-24"]), putUsage, cursor = { loggedIn: false }, cursorSync } = {}) => {
+const harness = ({
+  state = {},
+  token = TOKEN,
+  graph = graphFor(["2026-09-24"]),
+  putUsage,
+  cursor = { loggedIn: false },
+  cursorSync,
+  serverConfig = { githubClientId: "cid", apiVersion: 1 },
+  registration = (body) => ({ token: TOKEN, deviceId: body.deviceId, user: { login: "octo", name: "Octo", avatarUrl: "https://a" } }),
+  revoke,
+} = {}) => {
   const h = {
     state: { ...defaultState(), deviceId: DEVICE_ID, ...state },
     token,
@@ -36,6 +46,8 @@ const harness = ({ state = {}, token = TOKEN, graph = graphFor(["2026-09-24"]), 
     cursorSyncs: 0,
     apiOptions: [],
     registrations: [],
+    scopes: [],
+    events: [],
   };
   h.deps = {
     getConfig: () => ({ apiUrl: "http://api.test", configDir: "/cfg" }),
@@ -53,30 +65,37 @@ const harness = ({ state = {}, token = TOKEN, graph = graphFor(["2026-09-24"]), 
         h.token = value;
       },
       deleteToken: async () => {
+        h.events.push("deleteToken");
         h.token = null;
       },
     },
     createApi: (options) => {
       h.apiOptions.push(options);
       return {
-        getConfig: async () => ({ githubClientId: "cid", apiVersion: 1 }),
+        getConfig: async () => serverConfig,
         registerDevice: async (body) => {
           h.registrations.push(body);
-          return { token: TOKEN, deviceId: body.deviceId, user: { login: "octo", name: "Octo", avatarUrl: "https://a" } };
+          return registration(body);
         },
         putUsage: async (body) => {
           h.uploads.push(body);
           return putUsage ? putUsage(body, h.uploads.length) : { upserted: body.rows.length };
         },
         getMe: async () => null,
+        revokeSelf: async () => {
+          h.events.push(`revokeSelf:${options.token}`);
+          if (revoke instanceof Error) throw revoke;
+          return null;
+        },
       };
     },
-    githubDeviceFlow: async ({ clientId, onCode }) => {
+    githubDeviceFlow: async ({ clientId, scope, onCode }) => {
       assert.equal(clientId, "cid");
+      h.scopes.push(scope);
       await onCode({ userCode: "ABCD-1234", verificationUri: "https://github.com/login/device", expiresIn: 900 });
       return "gho_x";
     },
-    computerName: async () => "Octo Mac",
+    defaultDeviceName: () => "Octo Mac",
     randomUUID: () => DEVICE_ID,
     cursorStatus: async () => {
       if (cursor instanceof Error) throw cursor;
@@ -166,7 +185,10 @@ test("sync does not retry 4xx failures", async () => {
 
 test("sync on 401 deletes the token and throws unauthorized", async () => {
   const h = harness({ putUsage: failing("unauthorized", 401) });
-  await assert.rejects(sync({ now, deps: h.deps }), (error) => error.code === "unauthorized");
+  await assert.rejects(
+    sync({ now, deps: h.deps }),
+    (error) => error.code === "unauthorized" && /device login expired or was revoked, run leaderborder login again/.test(error.message),
+  );
   assert.equal(h.token, null);
   assert.equal(h.uploads.length, 1);
   assert.equal(h.state.lastError.code, "unauthorized");
@@ -253,6 +275,77 @@ test("login reuses the persisted deviceId", async () => {
   assert.equal(h.registrations[0].deviceId, "11111111-2222-4333-8444-555555555555");
 });
 
+test("login uses the default device name unless one is given", async () => {
+  const h = harness({ token: null });
+  await login({ onCode: () => {}, deps: h.deps });
+  await login({ onCode: () => {}, deviceName: "  Work Mac ", deps: h.deps });
+  assert.deepEqual(h.registrations.map((r) => r.deviceName), ["Octo Mac", "Work Mac"]);
+  assert.equal(h.state.deviceName, "Work Mac");
+});
+
+test("login rejects an invalid device name before talking to anyone", async () => {
+  for (const deviceName of ["", "   ", "x".repeat(61), "Mac\u001b[31m", "Mac\nMac"]) {
+    const h = harness({ token: null });
+    await assert.rejects(login({ onCode: () => {}, deviceName, deps: h.deps }), { code: "invalid_config" });
+    assert.equal(h.apiOptions.length, 0);
+    assert.equal(h.saves, 0);
+  }
+});
+
+test("login passes an explicit apiUrl to getConfig", async () => {
+  const h = harness();
+  const received = [];
+  h.deps.getConfig = (env, overrides) => {
+    received.push(overrides);
+    return { apiUrl: "http://api.test", configDir: "/cfg" };
+  };
+  await login({ onCode: () => {}, apiUrl: "https://staging.test", deps: h.deps });
+  assert.deepEqual(received, [{ apiUrl: "https://staging.test" }]);
+});
+
+test("login requests the GitHub scope announced by the server", async () => {
+  const scoped = harness({ serverConfig: { githubClientId: "cid", githubScope: "read:org", apiVersion: 2 } });
+  await login({ onCode: () => {}, deps: scoped.deps });
+  const unscoped = harness({ serverConfig: { githubClientId: "cid", githubScope: "", apiVersion: 2 } });
+  await login({ onCode: () => {}, deps: unscoped.deps });
+  const legacy = harness();
+  await login({ onCode: () => {}, deps: legacy.deps });
+  assert.deepEqual([scoped.scopes, unscoped.scopes, legacy.scopes], [["read:org"], [""], ["read:org"]]);
+});
+
+test("login refuses an unsupported GitHub scope from the server", async () => {
+  const h = harness({ token: null, serverConfig: { githubClientId: "cid", githubScope: "repo", apiVersion: 2 } });
+  await assert.rejects(login({ onCode: () => {}, deps: h.deps }), (error) => error.code === "upload_failed" && /scope/.test(error.message));
+  assert.deepEqual(h.scopes, []);
+  assert.equal(h.token, null);
+});
+
+test("login rejects a malformed device id or login from the server and stores nothing", async () => {
+  const bad = [
+    { deviceId: "not-a-uuid", user: { login: "octo" } },
+    { deviceId: "8f14e45f-ceea-1e7a-9f1b-2c3d4e5f6a7b", user: { login: "octo" } },
+    { deviceId: DEVICE_ID, user: { login: "octo\u001b[31m" } },
+    { deviceId: DEVICE_ID, user: { login: "" } },
+    { deviceId: DEVICE_ID, user: { login: "x".repeat(40) } },
+    { deviceId: DEVICE_ID, user: { login: "octo cat" } },
+    { deviceId: DEVICE_ID },
+    { user: { login: "octo" } },
+  ];
+  for (const response of bad) {
+    const h = harness({ token: null, state: { deviceId: null }, registration: () => ({ token: TOKEN, ...response }) });
+    await assert.rejects(login({ onCode: () => {}, deps: h.deps }), (error) => error.code === "upload_failed" && /server returned an invalid/.test(error.message));
+    assert.equal(h.token, null, JSON.stringify(response));
+  }
+});
+
+test("login accepts an uppercase device id and a hyphenated login from the server", async () => {
+  const h = harness({ token: null, registration: () => ({ token: TOKEN, deviceId: DEVICE_ID.toUpperCase(), user: { login: "octo-cat-1" } }) });
+  const result = await login({ onCode: () => {}, deps: h.deps });
+  assert.equal(result.user.login, "octo-cat-1");
+  assert.equal(h.state.deviceId, DEVICE_ID.toUpperCase());
+  assert.equal(h.token, TOKEN);
+});
+
 test("login fails without a GitHub client id", async () => {
   const h = harness();
   const base = h.deps.createApi;
@@ -268,11 +361,30 @@ test("login does not store a token when registration is forbidden", async () => 
   assert.equal(h.token, null);
 });
 
-test("logout deletes the token and clears the device", async () => {
+test("logout revokes the token on the server, then deletes it and clears the device", async () => {
   const h = harness({ state: { lastSyncAt: "2026-09-23T10:00:00.000Z", summary: { topModel: "x" } } });
-  await logout({ deps: h.deps });
+  assert.deepEqual(await logout({ deps: h.deps }), { revoked: true });
+  assert.deepEqual(h.events, [`revokeSelf:${TOKEN}`, "deleteToken"]);
+  assert.equal(h.apiOptions[0].apiUrl, "http://api.test");
   assert.equal(h.token, null);
   assert.equal(h.state.deviceId, null);
   assert.equal(h.state.lastSyncAt, null);
   assert.equal(h.state.summary, null);
+});
+
+test("logout still deletes the token locally when revocation fails", async () => {
+  for (const revoke of [new LeaderborderError("unauthorized", "revoked", { status: 401 }), new LeaderborderError("network", "offline"), new LeaderborderError("upload_failed", "500", { status: 500 })]) {
+    const h = harness({ revoke });
+    assert.deepEqual(await logout({ deps: h.deps }), { revoked: false });
+    assert.deepEqual(h.events, [`revokeSelf:${TOKEN}`, "deleteToken"]);
+    assert.equal(h.token, null);
+    assert.equal(h.state.deviceId, null);
+  }
+});
+
+test("logout without a stored token skips revocation", async () => {
+  const h = harness({ token: null });
+  assert.deepEqual(await logout({ deps: h.deps }), { revoked: false });
+  assert.deepEqual(h.events, ["deleteToken"]);
+  assert.equal(h.state.deviceId, null);
 });

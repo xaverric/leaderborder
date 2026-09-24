@@ -42,7 +42,7 @@ export const isTrustedUrl = (expectedHref, actual) => {
 export const registerIpc = ({ ipcMain, handlers, expectedHref }) => {
   for (const channel of CHANNELS) {
     ipcMain.handle(channel, (event, arg) => {
-      if (!isTrustedUrl(expectedHref, event?.senderFrame?.url)) throw new Error("Untrusted sender");
+      if (!event?.senderFrame || event.senderFrame !== event.sender?.mainFrame || !isTrustedUrl(expectedHref, event.senderFrame.url)) throw new Error("Untrusted sender");
       return handlers[channel](arg);
     });
   }

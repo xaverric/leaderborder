@@ -12,6 +12,14 @@ files:
   - "!node_modules/**"
   - node_modules/@tokscale/**
 asar: true
+electronFuses:
+  resetAdHocDarwinSignature: true
+  runAsNode: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+  grantFileProtocolExtraPrivileges: false
 extraMetadata:
   dependencies: null
 asarUnpack:
@@ -20,8 +28,7 @@ mac:
   category: public.app-category.developer-tools
   target:
     - dmg
-  identity: null
-  hardenedRuntime: false
+  hardenedRuntime: true
   extendInfo:
     LSUIElement: true
 dmg:

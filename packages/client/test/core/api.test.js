@@ -3,13 +3,13 @@ import assert from "node:assert/strict";
 import { createApi } from "../../src/core/api.js";
 import { fakeFetch, jsonResponse } from "./fake-fetch.js";
 
-const apiUrl = "http://api.test";
+const apiUrl = "https://api.test";
 const token = `lb_${"a".repeat(43)}`;
 
 test("getConfig fetches /api/config without auth", async () => {
   const fetch = fakeFetch([{ githubClientId: "cid", apiVersion: 1 }]);
   assert.deepEqual(await createApi({ apiUrl, fetch }).getConfig(), { githubClientId: "cid", apiVersion: 1 });
-  assert.equal(fetch.calls[0].url, "http://api.test/api/config");
+  assert.equal(fetch.calls[0].url, "https://api.test/api/config");
   assert.equal(fetch.calls[0].method, "GET");
   assert.equal(fetch.calls[0].headers.authorization, undefined);
   assert.equal(fetch.calls[0].headers.accept, "application/json");
@@ -20,7 +20,7 @@ test("registerDevice posts the device registration", async () => {
   const body = { githubToken: "gho_x", deviceId: "d1", deviceName: "Mac" };
   const result = await createApi({ apiUrl, fetch }).registerDevice(body);
   assert.equal(result.token, token);
-  assert.equal(fetch.calls[0].url, "http://api.test/api/devices");
+  assert.equal(fetch.calls[0].url, "https://api.test/api/devices");
   assert.equal(fetch.calls[0].method, "POST");
   assert.equal(fetch.calls[0].headers["content-type"], "application/json");
   assert.deepEqual(JSON.parse(fetch.calls[0].body), body);
@@ -31,7 +31,7 @@ test("putUsage sends PUT /api/usage with the bearer token", async () => {
   const body = { deviceId: "d1", tokscaleVersion: "4.17.0", rows: [{ day: "2026-09-24" }] };
   assert.deepEqual(await createApi({ apiUrl, fetch, token }).putUsage(body), { upserted: 2 });
   assert.equal(fetch.calls[0].method, "PUT");
-  assert.equal(fetch.calls[0].url, "http://api.test/api/usage");
+  assert.equal(fetch.calls[0].url, "https://api.test/api/usage");
   assert.equal(fetch.calls[0].headers.authorization, `Bearer ${token}`);
   assert.deepEqual(JSON.parse(fetch.calls[0].body), body);
 });
@@ -39,8 +39,22 @@ test("putUsage sends PUT /api/usage with the bearer token", async () => {
 test("getMe fetches /api/me with the bearer token", async () => {
   const fetch = fakeFetch([{ user: { login: "octo" }, rank: null, devices: [] }]);
   assert.equal((await createApi({ apiUrl, fetch, token }).getMe()).user.login, "octo");
-  assert.equal(fetch.calls[0].url, "http://api.test/api/me");
+  assert.equal(fetch.calls[0].url, "https://api.test/api/me");
   assert.equal(fetch.calls[0].headers.authorization, `Bearer ${token}`);
+});
+
+test("revokeSelf sends DELETE /api/me/devices/self with the bearer token", async () => {
+  const fetch = fakeFetch([new Response(null, { status: 204 })]);
+  assert.equal(await createApi({ apiUrl, fetch, token }).revokeSelf(), null);
+  assert.equal(fetch.calls[0].method, "DELETE");
+  assert.equal(fetch.calls[0].url, "https://api.test/api/me/devices/self");
+  assert.equal(fetch.calls[0].headers.authorization, `Bearer ${token}`);
+  assert.equal(fetch.calls[0].body, undefined);
+});
+
+test("revokeSelf maps 401 to unauthorized", async () => {
+  const fetch = fakeFetch([jsonResponse({ error: { code: "unauthorized", message: "revoked" } }, 401)]);
+  await assert.rejects(createApi({ apiUrl, fetch, token }).revokeSelf(), (error) => error.code === "unauthorized" && error.status === 401);
 });
 
 const failWith = async (reply) => {

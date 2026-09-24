@@ -16,7 +16,9 @@
   "main": "./src/app/main.js",
   "files": [
     "src",
-    "assets"
+    "!src/app/fake-core.js",
+    "assets",
+    "!assets/generate-tray-icon.js"
   ],
   "engines": {
     "node": ">=22"
@@ -30,7 +32,7 @@
   },
   "dependencies": {
     "@tokscale/cli": "4.17.0",
-    "electron": "^44.4.5"
+    "electron": "44.4.5"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

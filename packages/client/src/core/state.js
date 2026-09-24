@@ -1,4 +1,5 @@
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 
 export const defaultState = () => ({
@@ -26,7 +27,11 @@ export const loadState = ({ configDir }) => {
 export const saveState = ({ configDir }, state) => {
   mkdirSync(configDir, { recursive: true, mode: 0o700 });
   const file = stateFile(configDir);
-  const temp = `${file}.${process.pid}.tmp`;
-  writeFileSync(temp, `${JSON.stringify({ ...defaultState(), ...pickKnown(state) }, null, 2)}\n`, { mode: 0o600 });
-  renameSync(temp, file);
+  const temp = `${file}.${randomUUID()}.tmp`;
+  try {
+    writeFileSync(temp, `${JSON.stringify({ ...defaultState(), ...pickKnown(state) }, null, 2)}\n`, { mode: 0o600, flag: "wx" });
+    renameSync(temp, file);
+  } finally {
+    rmSync(temp, { force: true });
+  }
 };

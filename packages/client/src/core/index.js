@@ -6,5 +6,5 @@ export { toUsageRows, validateRow, rowTokens, syncWindow, summarize, chunk } fro
 export { createApi } from "./api.js";
 export { githubDeviceFlow } from "./github.js";
 export { keychain, createKeychain } from "./keychain.js";
-export { computerName } from "./device.js";
+export { defaultDeviceName, parseDeviceName } from "./device.js";
 export { login, logout, sync } from "./session.js";

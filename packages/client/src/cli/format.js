@@ -4,6 +4,8 @@ export const formatNumber = (value) => numberFormat.format(value);
 
 export const formatUsd = (value) => `$${value.toFixed(2)}`;
 
+export const cleanText = (value, max = 200) => String(value ?? "").replace(/\p{Cc}/gu, "").slice(0, max);
+
 const COLUMNS = [
   { key: "day", align: "left", format: String },
   { key: "client", align: "left", format: String },
@@ -44,7 +46,7 @@ export const formatSummary = (summary) =>
 export const formatStatus = ({ state, apiUrl, hasToken }) =>
   labelled([
     ["Logged in", hasToken && state.deviceId ? "yes" : "no"],
-    ["Device", state.deviceId ? `${state.deviceName ?? "unnamed"} (${state.deviceId})` : "-"],
+    ["Device", state.deviceId ? `${cleanText(state.deviceName) || "unnamed"} (${cleanText(state.deviceId)})` : "-"],
     ["API", apiUrl],
     ["Last sync", state.lastSyncAt ?? "never"],
     ...(state.summary
@@ -54,5 +56,7 @@ export const formatStatus = ({ state, apiUrl, hasToken }) =>
           ["Top model", state.summary.topModel ?? "-"],
         ]
       : []),
-    ...(state.lastError ? [["Last error", `[${state.lastError.code}] ${state.lastError.message} (${state.lastError.at})`]] : []),
+    ...(state.lastError
+      ? [["Last error", `[${cleanText(state.lastError.code)}] ${cleanText(state.lastError.message)} (${cleanText(state.lastError.at)})`]]
+      : []),
   ]);

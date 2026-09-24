@@ -21,6 +21,14 @@ test("getConfig honours LEADERBORDER_API_URL without trailing slash", () => {
   assert.equal(getConfig({ HOME: "/h", LEADERBORDER_API_URL: "http://localhost:8787/" }).apiUrl, "http://localhost:8787");
 });
 
+test("getConfig prefers an explicit apiUrl over LEADERBORDER_API_URL", () => {
+  const env = { HOME: "/h", LEADERBORDER_API_URL: "http://localhost:8787" };
+  assert.equal(getConfig(env, { apiUrl: "https://staging.test/" }).apiUrl, "https://staging.test");
+  assert.equal(getConfig(env, { apiUrl: undefined }).apiUrl, "http://localhost:8787");
+  assert.equal(getConfig({ HOME: "/h" }, {}).apiUrl, "https://leaderborder.xaverric.cz");
+  assert.throws(() => getConfig(env, { apiUrl: "http://remote.test" }), { code: "invalid_config" });
+});
+
 test("getConfig honours LEADERBORDER_CONFIG_DIR", () => {
   assert.equal(getConfig({ HOME: "/h", LEADERBORDER_CONFIG_DIR: "/tmp/lb" }).configDir, "/tmp/lb");
 });

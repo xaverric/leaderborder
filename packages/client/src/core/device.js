@@ -1,14 +1,9 @@
-import { execFile as nodeExecFile } from "node:child_process";
-import { hostname as osHostname } from "node:os";
+export const MAX_NAME_LENGTH = 60;
+const PRINTABLE = /^\P{C}+$/u;
 
-const MAX_NAME_LENGTH = 60;
+export const defaultDeviceName = ({ arch = process.arch } = {}) => `Mac (${arch})`;
 
-const scutilName = (execFile) =>
-  new Promise((resolve) => {
-    execFile("scutil", ["--get", "ComputerName"], { timeout: 5000 }, (error, stdout) => resolve(error ? "" : String(stdout).trim()));
-  });
-
-export const computerName = async ({ execFile = nodeExecFile, hostname = osHostname } = {}) => {
-  const name = (await scutilName(execFile)) || String(hostname() ?? "").trim() || "Mac";
-  return name.slice(0, MAX_NAME_LENGTH);
+export const parseDeviceName = (value) => {
+  const name = String(value ?? "").trim();
+  return name.length > 0 && name.length <= MAX_NAME_LENGTH && PRINTABLE.test(name) ? name : null;
 };

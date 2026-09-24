@@ -12,6 +12,8 @@ const FAILURE_MESSAGES = {
 const post = async (fetch, url, params) => {
   const response = await fetch(url, {
     method: "POST",
+    redirect: "error",
+    signal: AbortSignal.timeout(15000),
     headers: { accept: "application/json", "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams(params).toString(),
   }).catch((cause) => {
@@ -27,13 +29,21 @@ const post = async (fetch, url, params) => {
 const pollFailure = (body) =>
   new LeaderborderError("unauthorized", FAILURE_MESSAGES[body.error] ?? `GitHub login failed: ${body.error_description ?? body.error}`);
 
-export const githubDeviceFlow = async ({ clientId, fetch = globalThis.fetch, onCode, sleep, scope = "read:org" }) => {
-  const code = await post(fetch, DEVICE_CODE_URL, { client_id: clientId, scope });
+export const githubDeviceFlow = async ({ clientId, fetch = globalThis.fetch, onCode, sleep, scope = "read:org", now = Date.now }) => {
+  const code = await post(fetch, DEVICE_CODE_URL, { client_id: clientId, ...(scope ? { scope } : {}) });
   if (!code.device_code) throw pollFailure(code);
+  if (code.verification_uri !== "https://github.com/login/device" || typeof code.user_code !== "string" ||
+      !Number.isFinite(code.expires_in) || code.expires_in <= 0 || code.expires_in > 1800 ||
+      (code.interval !== undefined && (!Number.isFinite(code.interval) || code.interval < 1))) {
+    throw new LeaderborderError("unauthorized", "Invalid GitHub device authorization response");
+  }
+  const deadline = now() + code.expires_in * 1000;
   await onCode({ userCode: code.user_code, verificationUri: code.verification_uri, expiresIn: code.expires_in });
   const params = { client_id: clientId, device_code: code.device_code, grant_type: GRANT_TYPE };
   const poll = async (intervalSeconds) => {
+    if (now() + intervalSeconds * 1000 >= deadline) throw new LeaderborderError("unauthorized", FAILURE_MESSAGES.expired_token);
     await sleep(intervalSeconds * 1000);
+    if (now() >= deadline) throw new LeaderborderError("unauthorized", FAILURE_MESSAGES.expired_token);
     const body = await post(fetch, ACCESS_TOKEN_URL, params);
     if (body.access_token) return body.access_token;
     if (body.error === "authorization_pending") return poll(intervalSeconds);

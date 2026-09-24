@@ -40,10 +40,12 @@ brew install --cask xaverric/tap/leaderborder   # app only
 
 Download `Leaderborder-<version>-arm64.dmg` (Apple Silicon) or `Leaderborder-<version>-x64.dmg` (Intel) from [GitHub Releases](https://github.com/xaverric/leaderborder/releases/latest) and drag the app to Applications.
 
-The app is not signed with an Apple Developer ID yet. On first launch right-click the app and choose Open, or remove the quarantine flag once:
+The app is not signed with an Apple Developer ID yet. On first launch right-click Leaderborder.app in Finder and choose Open.
+
+Verify a downloaded DMG against the GitHub build attestation before opening it:
 
 ```sh
-xattr -dr com.apple.quarantine /Applications/Leaderborder.app
+gh attestation verify Leaderborder-<version>-arm64.dmg -R xaverric/leaderborder
 ```
 
 ### CLI
@@ -55,9 +57,14 @@ leaderborder sync           # collect and upload usage now
 leaderborder sync --dry-run # print the rows that would be sent, send nothing
 leaderborder status [--json]
 leaderborder cursor-login   # connect Cursor usage (optional)
-leaderborder logout
+leaderborder logout         # revoke the device token on the server and remove it from the Keychain
 leaderborder --version
 ```
+
+Options:
+
+- `login --device-name <name>` names this device in your device list (1-60 printable characters). Default: `Mac (arm64)` or `Mac (x64)`.
+- `--api-url <url>` points `login`, `logout`, `sync` and `status` at another server and takes precedence over `LEADERBORDER_API_URL`. `login` prints the API host whenever it is not the default, so you can see where your GitHub token goes.
 
 ## How it works
 
@@ -81,7 +88,7 @@ What is sent, per day, tool and model:
 
 - token counts: input, output, cache read, cache write, reasoning
 - estimated API-equivalent cost in USD and the number of messages
-- a random device id, the device name you choose, and the tokscale version
+- a random device id, a device name and the tokscale version. The device name defaults to a generic `Mac (arm64)` or `Mac (x64)`; pass `leaderborder login --device-name <name>` to choose one. Only you see your own device names, other signed-in players see just the number of your devices.
 
 Your GitHub login, name and avatar are known to the server because you sign in with GitHub.
 
@@ -94,7 +101,7 @@ What is never sent:
 Credentials:
 
 - The GitHub token from sign-in is used once to register the device and is not stored.
-- The device token is stored only in the macOS Keychain (service `leaderborder`). The server keeps only its SHA-256 hash. Revoke a device any time on the web.
+- The device token is stored only in the macOS Keychain (service `leaderborder`). The server keeps only its SHA-256 hash. `leaderborder logout` revokes the token on the server and removes it from the Keychain; you can also revoke a device any time on the web.
 - If you connect Cursor, tokscale stores the Cursor session in `~/.config/tokscale/cursor-credentials.json` on your Mac.
 
 Other network traffic of the tokscale engine: model price lists (`raw.githubusercontent.com/BerriAI/litellm`, `openrouter.ai`, `models.dev`, plain GET without your data) and `cursor.com` for Cursor usage if you connected it. leaderborder never calls the tokscale commands that talk to tokscale.ai (`login`, `submit`, `autosubmit`), so nothing goes there.
@@ -139,9 +146,10 @@ npx wrangler dev --local --var DEV_LOGIN:1 --var APP_URL:http://localhost:8787
 
 `npm run dev:worker` from the repo root starts `wrangler dev` too. The seed adds sample users, devices and about 90 days of usage. `DEV_LOGIN=1` enables a local sign-in without GitHub. It works only when `APP_URL` is `http://localhost:8787` and is never active in production.
 
-Point the client at the local Worker:
+Point the client at the local Worker with `--api-url` or `LEADERBORDER_API_URL`. `login` prints the API host whenever it is not the default:
 
 ```sh
+npx leaderborder sync --dry-run --api-url http://localhost:8787
 LEADERBORDER_API_URL=http://localhost:8787 npx leaderborder sync --dry-run
 ```
 

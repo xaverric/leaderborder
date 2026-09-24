@@ -15,9 +15,12 @@ const ERROR_COPY = {
   upload_failed: "Upload failed. Leaderborder will retry at the next sync.",
   network: "No connection to the leaderboard. Leaderborder will retry at the next sync.",
   forbidden: "Your GitHub account is not allowed on this leaderboard.",
-  unauthorized: "Your session expired. Sign in again.",
+  unauthorized: "Your device login expired or was revoked. Sign in again.",
   not_logged_in: "You are signed out. Sign in again.",
 };
+
+const GENERIC_ERROR = "Something went wrong. Run leaderborder status in a terminal for details.";
+const WARNING_COPY = "Cursor sync skipped";
 
 const trimUnit = (value) => (value < 100 ? value.toFixed(1) : String(Math.round(value))).replace(/\.0$/, "");
 
@@ -49,8 +52,7 @@ export const relativeTime = (iso, now) => {
   return `${Math.floor(diff / DAY)} d ago`;
 };
 
-export const errorMessage = (error) =>
-  ERROR_COPY[error?.code] ?? (error?.message ? String(error.message) : "Something went wrong.");
+export const errorMessage = (error) => ERROR_COPY[error?.code] ?? GENERIC_ERROR;
 
 export const normalizeDeviceCode = (arg) => ({
   userCode: arg?.userCode ?? arg?.user_code ?? null,
@@ -84,7 +86,7 @@ const accountView = (state, session, now) => {
       available: Boolean(session.loginItem?.available),
       enabled: Boolean(session.loginItem?.enabled),
     },
-    warning: session.warning ?? null,
+    warning: session.warning ? WARNING_COPY : null,
     errorMessage: failure ? errorMessage(failure) : null,
   };
 };

@@ -4,6 +4,7 @@ import { EventEmitter } from "node:events";
 import { existsSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import {
+  childEnv,
   tokscaleBin,
   runTokscale,
   readGraph,
@@ -13,6 +14,21 @@ import {
 } from "../../src/core/tokscale.js";
 
 const rejectsWithCode = (promise, code) => assert.rejects(promise, (error) => error.code === code);
+
+const STRIPPED = ["NODE_OPTIONS", "ELECTRON_RUN_AS_NODE", "NODE_TLS_REJECT_UNAUTHORIZED", "TOKSCALE_API_TOKEN"];
+
+const withEnv = async (entries, fn) => {
+  const previous = Object.fromEntries(Object.keys(entries).map((key) => [key, process.env[key]]));
+  Object.assign(process.env, entries);
+  try {
+    return await fn();
+  } finally {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+};
 
 test("tokscaleBin resolves the arch specific package binary", () => {
   const bin = tokscaleBin({
@@ -64,8 +80,62 @@ test("runTokscale defaults the timeout to 120 s", async () => {
     timeout = options.timeout;
     callback(null, "", "");
   };
-  await runTokscale([], { bin: "/bin/tokscale", execFile });
+  await runTokscale(["--version"], { bin: "/bin/tokscale", execFile });
   assert.equal(timeout, 120000);
+});
+
+test("runTokscale refuses commands outside the allowlist before spawning", async () => {
+  const refused = [
+    ["submit"],
+    ["autosubmit", "--enable"],
+    ["login"],
+    ["report"],
+    ["delete-submitted-data"],
+    ["cursor", "delete"],
+    ["cursor"],
+    ["--version", "--help"],
+    ["--help"],
+    [],
+  ];
+  for (const args of refused) {
+    const execFile = () => assert.fail(`spawned tokscale ${args.join(" ")}`);
+    await assert.rejects(
+      runTokscale(args, { bin: "/bin/tokscale", execFile }),
+      (error) => error.code === "tokscale_failed" && /not allowed/.test(error.message),
+      args.join(" "),
+    );
+  }
+});
+
+test("runTokscale allows --version, graph and the cursor status, sync and login subcommands", async () => {
+  const seen = [];
+  const execFile = (file, args, options, callback) => {
+    seen.push(args);
+    callback(null, "", "");
+  };
+  for (const args of [["--version"], ["graph", "--output", "/tmp/x"], ["cursor", "status"], ["cursor", "sync"], ["cursor", "login", "--name", "default"]]) {
+    await runTokscale(args, { bin: "/bin/tokscale", execFile });
+  }
+  assert.equal(seen.length, 5);
+});
+
+test("childEnv strips Node and tokscale credential variables and forces NO_COLOR", () => {
+  const env = childEnv({ PATH: "/bin", HOME: "/h", NO_COLOR: "0", ...Object.fromEntries(STRIPPED.map((key) => [key, "synthetic"])) });
+  assert.deepEqual(env, { PATH: "/bin", HOME: "/h", NO_COLOR: "1" });
+});
+
+test("runTokscale passes the reduced environment to the child", async () => {
+  let env;
+  const execFile = (file, args, options, callback) => {
+    env = options.env;
+    callback(null, "", "");
+  };
+  await withEnv(Object.fromEntries(STRIPPED.map((key) => [key, "synthetic"])), () =>
+    runTokscale(["--version"], { bin: "/bin/tokscale", execFile }),
+  );
+  STRIPPED.forEach((key) => assert.equal(env[key], undefined, key));
+  assert.equal(env.NO_COLOR, "1");
+  assert.equal(env.PATH, process.env.PATH);
 });
 
 test("runTokscale wraps failures as tokscale_failed including stderr", async () => {
@@ -150,6 +220,8 @@ test("cursorLogin spawns cursor login with the default account name", async () =
   assert.deepEqual(calls[0].args, ["cursor", "login", "--name", "default"]);
   assert.equal(calls[0].file, "/bin/tokscale");
   assert.equal(calls[0].options.stdio, "inherit");
+  assert.equal(calls[0].options.env.NO_COLOR, "1");
+  STRIPPED.forEach((key) => assert.equal(calls[0].options.env[key], undefined, key));
 });
 
 test("cursorLogin rejects on non-zero exit", async () => {

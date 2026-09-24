@@ -30,7 +30,7 @@ export const validateRow = (row, now = new Date()) => [
   ...(typeof row.client === "string" && CLIENT_PATTERN.test(row.client) ? [] : ["client"]),
   ...(typeof row.model === "string" && MODEL_PATTERN.test(row.model) ? [] : ["model"]),
   ...INTEGER_FIELDS.filter((field) => !(Number.isSafeInteger(row[field]) && row[field] >= 0)),
-  ...(typeof row.costUsd === "number" && Number.isFinite(row.costUsd) && row.costUsd >= 0 ? [] : ["costUsd"]),
+  ...(typeof row.costUsd === "number" && Number.isFinite(row.costUsd) && row.costUsd >= 0 && row.costUsd <= 1_000_000_000 ? [] : ["costUsd"]),
 ];
 
 const entryRow = (day, entry) => ({

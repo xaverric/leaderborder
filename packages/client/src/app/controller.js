@@ -14,6 +14,16 @@ export const isHttpsUrl = (url) => {
   }
 };
 
+export const externalHosts = (apiUrl) => {
+  try {
+    return ["github.com", new URL(apiUrl).host];
+  } catch {
+    return ["github.com"];
+  }
+};
+
+export const isAllowedExternalUrl = (url, hosts) => isHttpsUrl(url) && hosts.includes(new URL(url).host);
+
 const SIGNED_OUT_CODES = new Set(["unauthorized", "not_logged_in"]);
 
 const toFailure = (error) => ({ code: error?.code ?? null, message: errorMessage(error) });
@@ -27,6 +37,8 @@ export const createController = ({ core, openExternal, writeClipboard, loginItem
 
   let state = null;
   let loginInFlight = null;
+  let syncInFlight = null;
+  let logoutInFlight = null;
   let session = {
     loading: true,
     signedIn: false,
@@ -70,7 +82,7 @@ export const createController = ({ core, openExternal, writeClipboard, loginItem
 
   const refreshMe = async () => {
     try {
-      const token = await core.keychain.getToken();
+      const token = await core.keychain.getToken(config);
       if (!token) return;
       const me = await core.createApi({ apiUrl: config.apiUrl, fetch: globalThis.fetch, token }).getMe();
       update({ me: { user: me.user, rank: me.rank ?? null } });
@@ -85,8 +97,7 @@ export const createController = ({ core, openExternal, writeClipboard, loginItem
     return Boolean(status?.loggedIn);
   };
 
-  const runSync = async () => {
-    if (!session.signedIn) return;
+  const performSync = async () => {
     update({ syncing: true });
     try {
       const result = await core.sync({ fetch: globalThis.fetch });
@@ -102,6 +113,15 @@ export const createController = ({ core, openExternal, writeClipboard, loginItem
     }
   };
 
+  const runSync = () => {
+    if (!session.signedIn || logoutInFlight) return Promise.resolve();
+    if (syncInFlight) return syncInFlight;
+    syncInFlight = performSync().finally(() => {
+      syncInFlight = null;
+    });
+    return syncInFlight;
+  };
+
   const scheduler = createScheduler({
     run: runSync,
     now: () => now().getTime(),
@@ -111,7 +131,7 @@ export const createController = ({ core, openExternal, writeClipboard, loginItem
 
   const init = async () => {
     await refreshState();
-    const token = await Promise.resolve(core.keychain.getToken()).catch(() => null);
+    const token = await Promise.resolve(core.keychain.getToken(config)).catch(() => null);
     update({ loading: false, signedIn: Boolean(token), loginItem: readLoginItem() });
     await Promise.all([refreshMe(), refreshCursor()]);
     return view();
@@ -153,7 +173,8 @@ export const createController = ({ core, openExternal, writeClipboard, loginItem
 
   const openGithub = () => Boolean(session.signingIn) && openHttps(session.signingIn.verificationUri);
 
-  const logout = async () => {
+  const performLogout = async () => {
+    await syncInFlight;
     try {
       await core.logout();
     } catch (error) {
@@ -161,6 +182,14 @@ export const createController = ({ core, openExternal, writeClipboard, loginItem
     }
     await refreshState();
     return update({ signedIn: false, me: null, error: null, notice: null });
+  };
+
+  const logout = () => {
+    if (logoutInFlight) return logoutInFlight;
+    logoutInFlight = performLogout().finally(() => {
+      logoutInFlight = null;
+    });
+    return logoutInFlight;
   };
 
   const withTimeout = (promise, ms) =>

@@ -1,28 +1,27 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { computerName } from "../../src/core/device.js";
+import { defaultDeviceName, parseDeviceName, MAX_NAME_LENGTH } from "../../src/core/device.js";
 
-const execFileReturning = (error, stdout, calls = []) => (file, args, options, callback) => {
-  calls.push({ file, args });
-  callback(error, stdout, "");
-};
-
-test("computerName uses scutil ComputerName", async () => {
-  const calls = [];
-  assert.equal(await computerName({ execFile: execFileReturning(null, "Octo's MacBook\n", calls), hostname: () => "h" }), "Octo's MacBook");
-  assert.deepEqual(calls[0], { file: "scutil", args: ["--get", "ComputerName"] });
+test("defaultDeviceName is a generic name with the CPU architecture", () => {
+  assert.equal(defaultDeviceName({ arch: "arm64" }), "Mac (arm64)");
+  assert.equal(defaultDeviceName({ arch: "x64" }), "Mac (x64)");
+  assert.equal(defaultDeviceName(), `Mac (${process.arch})`);
 });
 
-test("computerName falls back to hostname", async () => {
-  assert.equal(await computerName({ execFile: execFileReturning(new Error("x"), ""), hostname: () => "octo.local" }), "octo.local");
-  assert.equal(await computerName({ execFile: execFileReturning(null, "  \n"), hostname: () => "octo.local" }), "octo.local");
+test("parseDeviceName trims and accepts printable names up to the limit", () => {
+  assert.equal(parseDeviceName("  Work Mac  "), "Work Mac");
+  assert.equal(parseDeviceName("Octo's MacBook Pro"), "Octo's MacBook Pro");
+  assert.equal(parseDeviceName("Praha kancelář"), "Praha kancelář");
+  assert.equal(parseDeviceName("x".repeat(MAX_NAME_LENGTH)), "x".repeat(MAX_NAME_LENGTH));
 });
 
-test("computerName falls back to Mac when nothing is known", async () => {
-  assert.equal(await computerName({ execFile: execFileReturning(new Error("x"), ""), hostname: () => "" }), "Mac");
-});
-
-test("computerName caps the name at 60 characters", async () => {
-  const name = await computerName({ execFile: execFileReturning(null, "x".repeat(80)), hostname: () => "h" });
-  assert.equal(name.length, 60);
+test("parseDeviceName rejects empty, too long and non-printable names", () => {
+  assert.equal(parseDeviceName(""), null);
+  assert.equal(parseDeviceName("   "), null);
+  assert.equal(parseDeviceName(undefined), null);
+  assert.equal(parseDeviceName(null), null);
+  assert.equal(parseDeviceName("x".repeat(MAX_NAME_LENGTH + 1)), null);
+  assert.equal(parseDeviceName("Mac\u001b[31m"), null);
+  assert.equal(parseDeviceName("Mac\nMac"), null);
+  assert.equal(parseDeviceName("Mac​Mac"), null);
 });

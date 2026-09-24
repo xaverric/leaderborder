@@ -75,9 +75,14 @@ test("errorMessage maps core codes to friendly copy", () => {
   assert.match(errorMessage({ code: "network", message: "x" }), /connection/i);
   assert.match(errorMessage({ code: "upload_failed", message: "x" }), /Upload failed/);
   assert.match(errorMessage({ code: "forbidden", message: "x" }), /not allowed/);
-  assert.match(errorMessage({ code: "unauthorized", message: "x" }), /Sign in again/);
-  assert.equal(errorMessage({ message: "Boom" }), "Boom");
-  assert.equal(errorMessage(null), "Something went wrong.");
+  assert.match(errorMessage({ code: "unauthorized", message: "x" }), /expired or was revoked\. Sign in again/);
+});
+
+test("errorMessage never shows raw messages for unknown errors", () => {
+  const generic = "Something went wrong. Run leaderborder status in a terminal for details.";
+  assert.equal(errorMessage({ message: "Boom" }), generic);
+  assert.equal(errorMessage({ code: "weird", message: "\u001b[31mspawn ENOENT /Users/octo/.config" }), generic);
+  assert.equal(errorMessage(null), generic);
 });
 
 test("normalizeDeviceCode accepts camelCase and GitHub snake_case", () => {
@@ -212,9 +217,9 @@ test("loading view before the controller is initialised", () => {
   assert.deepEqual(view, { kind: "loading", trayTitle: "" });
 });
 
-test("warning passes through on account views", () => {
-  const view = toView({ state: baseState, session: { ...baseSession, warning: "Cursor sync skipped: x" }, now: NOW });
+test("warning shows fixed copy without the raw tokscale output", () => {
+  const view = toView({ state: baseState, session: { ...baseSession, warning: "Cursor sync skipped: \u001b[31m/Users/octo stderr" }, now: NOW });
   assert.equal(view.kind, "idle");
-  assert.equal(view.warning, "Cursor sync skipped: x");
+  assert.equal(view.warning, "Cursor sync skipped");
   assert.equal(toView({ state: baseState, session: baseSession, now: NOW }).warning, null);
 });

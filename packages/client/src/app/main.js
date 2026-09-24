@@ -15,12 +15,12 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { createController, isHttpsUrl } from "./controller.js";
-import { createFakeCore } from "./fake-core.js";
+import { createController, externalHosts, isAllowedExternalUrl } from "./controller.js";
 import { createHandlers, registerIpc } from "./ipc.js";
 import { POPOVER_SIZE, popoverPosition, shouldShowOnClick } from "./position.js";
 
-const FAKE_CORE = process.env.LEADERBORDER_FAKE_CORE === "1";
+const FAKE_CORE = !app.isPackaged && process.env.LEADERBORDER_FAKE_CORE === "1";
+const DEVTOOLS = process.env.LEADERBORDER_DEVTOOLS === "1";
 const PAPER = { light: "#fcfcfd", dark: "#0f1012" };
 const FIRST_SHOW_DELAY_MS = 400;
 
@@ -30,21 +30,20 @@ const INDEX_HREF = pathToFileURL(INDEX_PATH).href;
 const PRELOAD_PATH = resolveHere("./preload.cjs");
 const TRAY_ICON_PATH = resolveHere("../../assets/trayTemplate.png");
 
-const loadCore = async () =>
-  FAKE_CORE ? createFakeCore({ signedIn: process.env.LEADERBORDER_FAKE_SIGNED_IN === "1" }) : import("../core/index.js");
+const loadFakeCore = async () =>
+  (await import("./fake-core.js")).createFakeCore({ signedIn: process.env.LEADERBORDER_FAKE_SIGNED_IN === "1" });
 
-const openExternal = (url) => {
-  if (!isHttpsUrl(url)) return;
+const loadCore = async () => (FAKE_CORE ? loadFakeCore() : import("../core/index.js"));
+
+const externalOpener = (hosts) => (url) => {
+  if (!isAllowedExternalUrl(url, hosts)) return;
   if (FAKE_CORE) console.log(`[fake-core] openExternal ${url}`);
   else shell.openExternal(url).catch(() => null);
 };
 
 const hardenContents = () => {
   app.on("web-contents-created", (_event, contents) => {
-    contents.setWindowOpenHandler(({ url }) => {
-      openExternal(url);
-      return { action: "deny" };
-    });
+    contents.setWindowOpenHandler(() => ({ action: "deny" }));
     contents.on("will-navigate", (event) => event.preventDefault());
     contents.on("will-attach-webview", (event) => event.preventDefault());
   });
@@ -72,7 +71,7 @@ const createPopover = () =>
       nodeIntegration: false,
       webSecurity: true,
       spellcheck: false,
-      devTools: !app.isPackaged,
+      devTools: DEVTOOLS,
     },
   });
 
@@ -102,7 +101,7 @@ const run = async () => {
 
   const controller = createController({
     core,
-    openExternal,
+    openExternal: externalOpener(externalHosts(core.getConfig().apiUrl)),
     writeClipboard: (text) => clipboard.writeText(text),
     loginItem: {
       available: app.isPackaged && !FAKE_CORE,
@@ -121,7 +120,9 @@ const run = async () => {
 
   await app.whenReady();
   app.dock?.hide();
+  Menu.setApplicationMenu(null);
   session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
+  session.defaultSession.setPermissionCheckHandler(() => false);
 
   win = createPopover();
   tray = createTray();

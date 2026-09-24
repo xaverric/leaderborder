@@ -37,6 +37,15 @@ test("device flow requests a code with read:org scope and reports it", async () 
   assert.deepEqual(codes, [{ userCode: "ABCD-1234", verificationUri: "https://github.com/login/device", expiresIn: 900 }]);
 });
 
+test("device flow sends the requested scope and omits it when empty", async () => {
+  const scoped = fakeFetch([deviceCode, { access_token: "gho_x" }]);
+  await githubDeviceFlow({ clientId: "cid", fetch: scoped, scope: "read:org", onCode: () => {}, sleep: async () => {} });
+  assert.equal(new URLSearchParams(scoped.calls[0].body).get("scope"), "read:org");
+  const unscoped = fakeFetch([deviceCode, { access_token: "gho_x" }]);
+  await githubDeviceFlow({ clientId: "cid", fetch: unscoped, scope: "", onCode: () => {}, sleep: async () => {} });
+  assert.equal(new URLSearchParams(unscoped.calls[0].body).has("scope"), false);
+});
+
 test("device flow polls through pending and slow_down and returns the token", async () => {
   const { promise, fetch, sleeps } = run([{ error: "authorization_pending" }, { error: "slow_down" }, { access_token: "gho_x" }]);
   assert.equal(await promise, "gho_x");

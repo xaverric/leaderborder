@@ -2,6 +2,7 @@
 set -euo pipefail
 
 [ "$#" -eq 1 ] || { echo "Usage: scripts/fetch-tokscale-binary.sh <arm64|x64>" >&2; exit 2; }
+case "$1" in arm64|x64) ;; *) echo "Unsupported architecture" >&2; exit 2 ;; esac
 name="@tokscale/cli-darwin-$1"
 
 read -r version integrity < <(node -e '
@@ -12,7 +13,7 @@ read -r version integrity < <(node -e '
 
 dest=$(mktemp -d)
 trap 'rm -rf "$dest"' EXIT
-pack=$(npm pack "$name@$version" --pack-destination "$dest" --json)
+pack=$(npm pack "$name@$version" --pack-destination "$dest" --ignore-scripts --json)
 
 read -r file packed < <(node -e '
   const [entry] = JSON.parse(process.argv[1]);
