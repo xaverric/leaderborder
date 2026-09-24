@@ -68,6 +68,7 @@ jobs:
         if: env.HAS_CLOUDFLARE == 'true'
         with:
           node-version: 22
+          package-manager-cache: false
       - if: env.HAS_CLOUDFLARE == 'true'
         run: npm ci
       - name: Migrate D1 and deploy
