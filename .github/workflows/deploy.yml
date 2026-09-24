@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - packages/worker/**
+      - package.json
       - package-lock.json
       - .github/workflows/deploy.yml
   workflow_call:
@@ -35,11 +36,13 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm audit --audit-level=high
       - run: npm run test:worker
 
   deploy:
     name: Deploy to Cloudflare
     needs: [test]
+    if: github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     concurrency:
@@ -56,7 +59,7 @@ jobs:
     steps:
       - name: Skip without Cloudflare secrets
         if: env.HAS_CLOUDFLARE != 'true'
-        run: echo "::notice title=Deploy skipped::CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID is not set, see docs/RELEASING.md."
+        run: echo "::notice title=Deploy skipped::CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID is not set in the production environment, see docs/RELEASING.md."
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: env.HAS_CLOUDFLARE == 'true'
         with:
@@ -77,4 +80,4 @@ jobs:
           workingDirectory: packages/worker
           command: |
             d1 migrations apply leaderborder --remote
-            deploy
+            deploy --var GIT_SHA:${{ github.sha }}

@@ -19,9 +19,14 @@
     "dev:worker": "npm run dev -w @leaderborder/worker",
     "test:scripts": "node --test \"scripts/*.test.js\""
   },
+  "overrides": {
+    "sharp": "0.35.4"
+  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@microsoft/eslint-formatter-sarif": "^3.1.0",
     "eslint": "^10.11.0",
+    "eslint-plugin-security": "^4.0.1",
     "globals": "^17.12.0"
   }
 }

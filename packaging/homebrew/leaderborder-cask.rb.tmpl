@@ -26,11 +26,9 @@ cask "leaderborder" do
 
   caveats <<~EOS
     Leaderborder is not signed with an Apple Developer ID yet.
-    If macOS refuses to open it, remove the quarantine flag once:
-
-      xattr -dr com.apple.quarantine "#{appdir}/Leaderborder.app"
-
-    or right-click the app in Finder and choose Open.
+    The first time, right-click Leaderborder.app in Finder and choose Open.
+    Do not remove the quarantine flag; verify the download instead:
+      gh attestation verify <dmg> -R xaverric/leaderborder
 
     The device token lives in the macOS Keychain (service "leaderborder").
     Log out in the app before uninstalling to remove it.

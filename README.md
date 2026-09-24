@@ -40,11 +40,7 @@ brew install --cask xaverric/tap/leaderborder   # app only
 
 Download `Leaderborder-<version>-arm64.dmg` (Apple Silicon) or `Leaderborder-<version>-x64.dmg` (Intel) from [GitHub Releases](https://github.com/xaverric/leaderborder/releases/latest) and drag the app to Applications.
 
-The app is not signed with an Apple Developer ID yet. On first launch right-click the app and choose Open, or remove the quarantine flag once:
-
-```sh
-xattr -dr com.apple.quarantine /Applications/Leaderborder.app
-```
+The app is not signed with an Apple Developer ID yet. On first launch right-click the app in Finder and choose Open.
 
 ### CLI
 
@@ -81,7 +77,11 @@ What is sent, per day, tool and model:
 
 - token counts: input, output, cache read, cache write, reasoning
 - estimated API-equivalent cost in USD and the number of messages
-- a random device id, the device name you choose, and the tokscale version
+- a random device id, the device name and the tokscale version
+
+The device name defaults to a generic `Mac (arm64)` or `Mac (x64)` unless you sign in with `leaderborder login --device-name <name>`. Only you see your device names; other signed-in players see just how many devices you have.
+
+The numbers are self-reported by the client. The server checks only their format and limits, so the leaderboard is as honest as its players.
 
 Your GitHub login, name and avatar are known to the server because you sign in with GitHub.
 
@@ -95,11 +95,25 @@ Credentials:
 
 - The GitHub token from sign-in is used once to register the device and is not stored.
 - The device token is stored only in the macOS Keychain (service `leaderborder`). The server keeps only its SHA-256 hash. Revoke a device any time on the web.
-- If you connect Cursor, tokscale stores the Cursor session in `~/.config/tokscale/cursor-credentials.json` on your Mac.
+- The optional Cursor integration relies on the upstream tokscale tool, which stores the Cursor session in a plaintext file under `~/.config/tokscale` ([details](https://github.com/junhoyeo/tokscale#cursor-ide-commands)). Connect Cursor only if you accept that.
 
 Other network traffic of the tokscale engine: model price lists (`raw.githubusercontent.com/BerriAI/litellm`, `openrouter.ai`, `models.dev`, plain GET without your data) and `cursor.com` for Cursor usage if you connected it. leaderborder never calls the tokscale commands that talk to tokscale.ai (`login`, `submit`, `autosubmit`), so nothing goes there.
 
-The public landing page shows only anonymous totals. Per-person numbers require a GitHub sign-in, optionally limited to selected GitHub organizations.
+The public landing page shows only anonymous, rounded totals, and only once at least 3 players were active in the week. The web app loads GitHub avatars from GitHub and fonts from Google Fonts, so those servers see your IP address when you open it.
+
+### Who can sign in
+
+Access is deny-by-default. The operator lists the GitHub logins or organizations that may sign in (`ALLOWED_GITHUB_LOGINS`, `ALLOWED_GITHUB_ORGS` in `packages/worker/wrangler.toml`); a fully public leaderboard needs `PUBLIC_ACCESS = "1"` set explicitly. Changing the lists signs everyone out, because web sessions and device tokens are bound to the access policy. Device tokens expire after 90 days and web sessions after 7 days, so you sign in again from time to time. A blocked user loses web and device access immediately.
+
+You can delete your account and all its data on the Devices page of the web app or with `DELETE /api/me`.
+
+## Security
+
+How to report a vulnerability is in [SECURITY.md](SECURITY.md).
+
+- Release assets ship with `SHA256SUMS` and GitHub build provenance attestations. Verify a download with `shasum -a 256 -c SHA256SUMS` and `gh attestation verify <file> -R xaverric/leaderborder`.
+- The npm package will be published with [provenance](https://docs.npmjs.com/generating-provenance-statements).
+- Everything that leaves your Mac is listed in [Privacy](#privacy) above.
 
 ## Powered by tokscale
 

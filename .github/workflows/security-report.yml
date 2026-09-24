@@ -1,0 +1,51 @@
+name: Security report
+
+on:
+  schedule:
+    - cron: "17 7 * * 1"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: security-report
+  cancel-in-progress: true
+
+jobs:
+  report:
+    name: Weekly security report
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+      security-events: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - name: Collect alerts
+        run: |
+          gh api --paginate "repos/$GH_REPO/code-scanning/alerts?state=open&per_page=100" > code-scanning.json || echo null > code-scanning.json
+          gh api --paginate "repos/$GH_REPO/dependabot/alerts?state=open&per_page=100" > dependabot.json || echo null > dependabot.json
+          npm audit --package-lock-only --json > audit.json || true
+      - name: Build report
+        run: node scripts/security-report.js "$GH_REPO" code-scanning.json dependabot.json audit.json > report.md
+      - name: Publish to the rolling issue
+        env:
+          TITLE: Security report
+        run: |
+          cat report.md >> "$GITHUB_STEP_SUMMARY"
+          number=$(gh issue list --state open --search "in:title \"$TITLE\"" --json number,title \
+            --jq "map(select(.title == \"$TITLE\")) | first | .number // empty")
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --body-file report.md
+          else
+            gh issue create --title "$TITLE" --body-file report.md --label security
+          fi

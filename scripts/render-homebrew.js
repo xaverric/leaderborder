@@ -7,7 +7,8 @@ import { parseArgs } from "node:util";
 
 const DEFAULT_REPO = "xaverric/leaderborder";
 const TEMPLATE_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "packaging", "homebrew");
-const SEMVER = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
+// eslint-disable-next-line security/detect-unsafe-regex
+const SEMVER = /^\d{1,9}\.\d{1,9}\.\d{1,9}(?:-[0-9A-Za-z.-]{1,64})?$/;
 const SHA256_HEX = /^[0-9a-f]{64}$/;
 const REPO = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 

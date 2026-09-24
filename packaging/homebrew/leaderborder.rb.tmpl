@@ -14,8 +14,7 @@ class Leaderborder < Formula
   depends_on "node"
 
   def install
-    # Electron downloads its runtime in postinstall, `leaderborder app` needs it.
-    system "npm", "install", *std_npm_args(ignore_scripts: false)
+    system "npm", "install", *std_npm_args
     bin.install_symlink libexec.glob("bin/*")
   end
 

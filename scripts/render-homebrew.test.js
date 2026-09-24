@@ -94,7 +94,8 @@ test("renderHomebrew renders formula and cask from the real templates", async ()
   assert.match(cask, /app "Leaderborder\.app"/);
   assert.match(cask, /zap trash: \[/);
   assert.match(cask, /~\/\.config\/leaderborder/);
-  assert.match(cask, /xattr -dr com\.apple\.quarantine/);
+  assert.doesNotMatch(cask, /xattr -dr/);
+  assert.match(cask, /right-click Leaderborder\.app in Finder and choose Open/);
 });
 
 const withReleaseFiles = async (names, fn) => {
