@@ -1,4 +1,3 @@
-import { accessPolicy } from "../access.js";
 import { clearAccessRequest, recordAccessRequest, saveUserOrgs } from "../access-store.js";
 import { resolveGithubAccess } from "../github.js";
 import { HttpError, json } from "../http.js";
@@ -32,7 +31,7 @@ export const postDevice = async ({ env, body, now }) => {
   }
   const token = createDeviceToken();
   const [, , inserted] = await registerDevice(env.DB, {
-    deviceId, userId: user.id, name: body.deviceName.trim(), tokenHash: await hashToken(token), nowIso, accessPolicy: accessPolicy(env),
+    deviceId, userId: user.id, name: body.deviceName.trim(), tokenHash: await hashToken(token), nowIso,
     expiresAt: new Date(now.getTime() + TOKEN_TTL_MS).toISOString(),
   });
   if (inserted.meta.changes !== 1) throw new HttpError(403, "forbidden", "Device belongs to another user");
