@@ -158,6 +158,49 @@ const wireCopyButtons = () => {
   }
 };
 
+const APP_HREF = "/app";
+
+const openLink = (link, label) => {
+  link.href = APP_HREF;
+  link.removeAttribute("data-signin");
+  link.replaceChildren(label);
+};
+
+const rankLine = (me) =>
+  me.rank
+    ? h("p", { class: "hero__me" }, `Signed in as @${me.user.login}. You are `, h("strong", {}, `#${formatInteger(me.rank.position)}`), ` of ${formatInteger(me.rank.of)} this week.`)
+    : h("p", { class: "hero__me" }, `Signed in as @${me.user.login}. Install the app and sync to join this week's board.`);
+
+const renderSignedIn = (me) => {
+  const nav = $(".nav-pill [data-signin]");
+  if (nav) {
+    const avatar = me.user.avatarUrl ? h("img", { class: "avatar avatar--xs", src: me.user.avatarUrl, alt: "", width: 20, height: 20 }) : null;
+    nav.classList.add("nav-me");
+    nav.href = APP_HREF;
+    nav.removeAttribute("data-signin");
+    nav.setAttribute("aria-label", `Open leaderboard, signed in as ${me.user.login}`);
+    nav.replaceChildren(...[avatar, "Leaderboard"].filter(Boolean));
+  }
+  const hero = $(".hero__actions [data-signin]");
+  if (hero) {
+    openLink(hero, "Open leaderboard");
+    $(".hero__actions").after(rankLine(me));
+  }
+  const cta = $(".cta [data-signin]");
+  if (cta) openLink(cta, "Open leaderboard");
+  const lead = $(".cta__lead");
+  if (lead) lead.textContent = `You are signed in as @${me.user.login}.`;
+};
+
+const loadSession = async () => {
+  try {
+    renderSignedIn(await api.get("/api/me"));
+  } catch {
+    return;
+  }
+};
+
 for (const link of $$("[data-signin]")) link.href = signInHref("/app");
 wireCopyButtons();
+loadSession();
 loadStats();

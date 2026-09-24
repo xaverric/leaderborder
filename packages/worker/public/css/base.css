@@ -771,3 +771,27 @@ select {
 .nav-pill .btn {
   border-radius: var(--radius-pill);
 }
+
+.avatar {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--color-paper-3);
+  object-fit: cover;
+}
+
+.avatar--sm {
+  width: 28px;
+  height: 28px;
+}
+
+.avatar--lg {
+  width: 72px;
+  height: 72px;
+}
+
+.avatar--xs {
+  width: 20px;
+  height: 20px;
+}
