@@ -25,7 +25,8 @@
     "test": "node --test \"test/**/*.test.js\"",
     "start": "electron .",
     "build:app": "electron-builder --mac --config electron-builder.yml",
-    "compat:tokscale": "node test/compat/tokscale-compat.js"
+    "compat:tokscale": "node test/compat/tokscale-compat.js",
+    "test:e2e": "playwright test -c test/app/playwright.config.js"
   },
   "dependencies": {
     "@tokscale/cli": "4.17.0",

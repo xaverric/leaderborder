@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' https://avatars.githubusercontent.com; connect-src 'none'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Leaderborder</title>
+    <link rel="stylesheet" href="tokens.css" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="app.js" defer></script>
+  </head>
+  <body data-kind="loading">
+    <main class="pop">
+      <header class="pop__head">
+        <span class="brand">
+          <svg class="brand__mark" viewBox="0 0 16 16" aria-hidden="true">
+            <rect x="1" y="6" width="4" height="8" rx="0.75" />
+            <rect x="6" y="2" width="4" height="12" rx="0.75" />
+            <rect x="11" y="8" width="4" height="6" rx="0.75" />
+          </svg>
+          <span class="brand__name">Leaderborder</span>
+        </span>
+        <p class="status" role="status" aria-live="polite">
+          <span class="status__dot" aria-hidden="true"></span>
+          <span data-field="status-text"></span>
+        </p>
+      </header>
+
+      <section class="screen screen--intro" data-screen="signed-out" hidden>
+        <h1 class="intro__title">Put your token burn on the board.</h1>
+        <p class="intro__lede">
+          Sign in with GitHub to publish daily token totals from Claude Code, Codex, Cursor and more.
+        </p>
+        <p class="banner banner--negative" role="alert" data-show="notice" hidden>
+          <span data-field="notice"></span>
+        </p>
+        <button type="button" class="btn btn--primary btn--block" data-action="login" data-autofocus>
+          <span class="btn__label">Sign in with GitHub</span>
+        </button>
+        <p class="fineprint">
+          Only daily totals per tool and model leave this Mac. No prompts, file paths or session data.
+        </p>
+      </section>
+
+      <section class="screen screen--code" data-screen="signing-in" hidden>
+        <h1 class="code__title">Enter this code on GitHub</h1>
+        <p class="code__lede">GitHub opened in your browser. Paste the code there to connect this Mac.</p>
+        <p class="code__value" data-show="code" hidden>
+          <output data-field="user-code" aria-label="Device code"></output>
+        </p>
+        <p class="code__value code__value--pending" data-show="code-pending">Requesting a code</p>
+        <div class="row">
+          <button type="button" class="btn" data-action="copy-code" data-autofocus>
+            <span class="btn__label">Copy code</span>
+          </button>
+          <button type="button" class="btn btn--quiet" data-action="open-github">
+            <span class="btn__label">Open GitHub</span>
+          </button>
+        </div>
+        <p class="waiting"><span class="spinner" aria-hidden="true"></span>Waiting for approval on GitHub</p>
+      </section>
+
+      <section class="screen screen--account" data-screen="account" hidden>
+        <div class="today">
+          <div class="today__top">
+            <p class="today__label">Today</p>
+            <button type="button" class="btn btn--small" data-action="sync">
+              <span class="btn__label">Sync now</span>
+            </button>
+          </div>
+          <p class="today__value" data-field="today-tokens">0</p>
+          <p class="today__meta">tokens <span aria-hidden="true">·</span> <span data-field="today-cost"></span></p>
+        </div>
+
+        <p class="banner banner--negative" role="alert" data-show="error" hidden>
+          <span data-field="error-message"></span>
+        </p>
+        <p class="note" data-show="warning" hidden><span data-field="warning"></span></p>
+
+        <dl class="facts">
+          <div class="fact">
+            <dt>This week</dt>
+            <dd><span class="fact__num" data-field="week-tokens"></span> <span class="fact__sub fact__sub--num" data-field="week-cost"></span></dd>
+          </div>
+          <div class="fact">
+            <dt>Rank</dt>
+            <dd>
+              <span class="fact__num" data-field="rank-label"></span>
+              <span class="fact__sub" data-field="rank-detail"></span>
+            </dd>
+          </div>
+          <div class="fact fact--wide">
+            <dt>Top model</dt>
+            <dd class="fact__model" data-field="top-model"></dd>
+          </div>
+        </dl>
+
+        <div class="settings">
+          <div class="setting">
+            <span class="setting__text">
+              <span class="setting__name">Cursor</span>
+              <span class="setting__value" data-field="cursor-status"></span>
+            </span>
+            <button type="button" class="btn btn--small" data-action="cursor-login" data-show="cursor-connect">
+              <span class="btn__label">Connect Cursor</span>
+            </button>
+          </div>
+          <p class="hint" data-show="cursor-hint" hidden></p>
+
+          <div class="setting" data-show="login-item" hidden>
+            <span class="setting__text">
+              <span class="setting__name" id="login-item-label">Launch at login</span>
+            </span>
+            <button type="button" class="switch" role="switch" aria-checked="false" aria-labelledby="login-item-label" data-action="login-item">
+              <span class="switch__thumb" aria-hidden="true"></span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <div class="pop__action" data-show="account" hidden>
+        <button type="button" class="btn btn--primary btn--block" data-action="open-leaderboard" data-autofocus>
+          <span class="btn__label">Open leaderboard</span>
+        </button>
+      </div>
+
+      <footer class="pop__foot">
+        <span class="who" data-show="account" hidden>
+          <span class="avatar" aria-hidden="true">
+            <img class="avatar__img" data-field="avatar" alt="" referrerpolicy="no-referrer" hidden />
+            <span class="avatar__initial" data-field="initial"></span>
+          </span>
+          <span class="who__login" data-field="user-login"></span>
+          <button type="button" class="link" data-action="logout">Log out</button>
+        </span>
+        <button type="button" class="link" data-action="quit">Quit Leaderborder</button>
+      </footer>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,29 @@
+appId: cz.xaverric.leaderborder
+productName: Leaderborder
+copyright: Copyright (c) 2026 xaverric
+electronVersion: 44.4.5
+directories:
+  output: dist
+files:
+  - src/**
+  - assets/**
+  - "!assets/generate-tray-icon.js"
+  - package.json
+  - "!node_modules/**"
+  - node_modules/@tokscale/**
+asar: true
+extraMetadata:
+  dependencies: null
+asarUnpack:
+  - node_modules/@tokscale/**
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - dmg
+  identity: null
+  hardenedRuntime: false
+  extendInfo:
+    LSUIElement: true
+dmg:
+  artifactName: ${productName}-${version}-${arch}.${ext}
+publish: null
