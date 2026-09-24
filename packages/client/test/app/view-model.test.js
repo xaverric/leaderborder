@@ -78,6 +78,13 @@ test("errorMessage maps core codes to friendly copy", () => {
   assert.match(errorMessage({ code: "unauthorized", message: "x" }), /expired or was revoked\. Sign in again/);
 });
 
+test("errorMessage explains GitHub sign-in failures by reason, never by raw text", () => {
+  assert.match(errorMessage({ code: "github_login", reason: "device_flow_disabled", message: "x" }), /Device Flow is disabled/);
+  assert.match(errorMessage({ code: "github_login", reason: "expired_token", message: "x" }), /code expired/);
+  assert.match(errorMessage({ code: "github_login", reason: "access_denied", message: "x" }), /denied/);
+  assert.equal(errorMessage({ code: "github_login", reason: "other", message: "raw /Users/octo" }), "GitHub sign-in failed. Try again.");
+});
+
 test("errorMessage never shows raw messages for unknown errors", () => {
   const generic = "Something went wrong. Run leaderborder status in a terminal for details.";
   assert.equal(errorMessage({ message: "Boom" }), generic);
