@@ -7,7 +7,9 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "test": "vitest run",
-    "vendor": "node scripts/vendor.js"
+    "vendor": "node scripts/vendor.js",
+    "db:migrate:local": "wrangler d1 migrations apply leaderborder --local",
+    "db:seed:local": "wrangler d1 execute leaderborder --local --file test/fixtures/seed.sql"
   },
   "devDependencies": {
     "wrangler": "^4.138.0",
