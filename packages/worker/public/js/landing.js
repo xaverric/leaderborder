@@ -57,23 +57,44 @@ const drawActivity = (daily) => {
   draw();
 };
 
-const renderStats = (stats) => {
-  for (const el of $$("[data-stat]")) {
-    const value = stats[el.dataset.stat];
-    if (el.classList.contains("hero__figure")) countUp(el, value);
-    else el.textContent = FORMATS[el.dataset.format](value);
-  }
+const WEEKLY_STATS = new Set(["tokensThisWeek", "costThisWeekUsd"]);
 
-  $("[data-stat-exact]").textContent = `${formatInteger(stats.tokensThisWeek)} tokens in the last 7 days`;
-  $("[data-stat-updated]").textContent = `Live from the board, updated ${relativeTime(stats.updatedAt)}`;
+const renderHero = (stats, suppressed) => {
+  countUp($(".hero__figure"), suppressed ? stats.tokensAllTime : stats.tokensThisWeek);
+  $("[data-stat-exact]").textContent = suppressed
+    ? `${formatInteger(stats.tokensAllTime)} tokens tracked so far`
+    : `${formatInteger(stats.tokensThisWeek)} tokens in the last 7 days`;
+  $("[data-stat-updated]").textContent = suppressed
+    ? `Weekly numbers go live once ${stats.minGroup} players are active this week (${stats.activeThisWeek} of ${stats.minGroup} now).`
+    : `Live from the board, updated ${relativeTime(stats.updatedAt)}`;
+};
+
+const renderStripStats = (stats, suppressed) => {
+  for (const el of $$(".stat-strip [data-stat]")) {
+    const key = el.dataset.stat;
+    el.textContent = suppressed && WEEKLY_STATS.has(key) ? "-" : FORMATS[el.dataset.format](stats[key]);
+  }
+};
+
+const noteRow = (text) => h("li", { class: "models__row models__row--note muted" }, text);
+
+const renderStats = (stats) => {
+  const suppressed = stats.suppressed === true;
+  renderHero(stats, suppressed);
+  renderStripStats(stats, suppressed);
+  clear($("[data-stats-status]")).append(
+    suppressed ? `Weekly details stay hidden until ${stats.minGroup} players are active this week, so nobody's own usage shows up publicly.` : "",
+  );
 
   const facts = activityFacts(stats.daily, { end: isoDay(new Date()), days: 90 });
-  $("[data-activity-total]").textContent = `${formatCompact(facts.total)} tokens`;
-  $('[data-fact="busiest"]').textContent = facts.busiest ? formatCompact(facts.busiest.value) : "-";
-  $('[data-fact="busiestDay"]').textContent = facts.busiest ? formatDay(facts.busiest.day) : "no usage yet";
-  $('[data-fact="average"]').textContent = formatCompact(Math.round(facts.average));
-  $('[data-fact="activeDays"]').textContent = formatInteger(facts.activeDays);
-  drawActivity(stats.daily);
+  const fact = (text) => (suppressed ? "-" : text);
+  $("[data-activity-total]").textContent = suppressed ? "" : `${formatCompact(facts.total)} tokens`;
+  $('[data-fact="busiest"]').textContent = fact(facts.busiest ? formatCompact(facts.busiest.value) : "-");
+  $('[data-fact="busiestDay"]').textContent = suppressed ? "" : facts.busiest ? formatDay(facts.busiest.day) : "no usage yet";
+  $('[data-fact="average"]').textContent = fact(formatCompact(Math.round(facts.average)));
+  $('[data-fact="activeDays"]').textContent = fact(formatInteger(facts.activeDays));
+  if (suppressed) clear($("[data-activity]")).append(h("p", { class: "muted" }, `Daily activity appears once ${stats.minGroup} players are active this week.`));
+  else drawActivity(stats.daily);
 
   const byClient = new Map(stats.topClients.map((c) => [c.client, c.tokens]));
   for (const row of $$("[data-tools] [data-client]")) {
@@ -93,13 +114,11 @@ const renderStats = (stats) => {
   }
 
   const models = $("[data-models]");
-  models.replaceChildren(
-    ...(stats.topModels.length
-      ? stats.topModels.map((m, i) =>
-          h("li", { class: "models__row" }, h("span", { class: "models__rank" }, i + 1), h("span", { class: "models__name" }, m.model), h("span", { class: "models__value" }, formatCompact(m.tokens))),
-        )
-      : [h("li", { class: "models__row muted" }, "No usage recorded this week yet.")]),
+  const modelRows = stats.topModels.map((m, i) =>
+    h("li", { class: "models__row" }, h("span", { class: "models__rank" }, i + 1), h("span", { class: "models__name" }, m.model), h("span", { class: "models__value" }, formatCompact(m.tokens))),
   );
+  const emptyModels = suppressed ? `Appears once ${stats.minGroup} players are active this week.` : "No usage recorded this week yet.";
+  models.replaceChildren(...(modelRows.length ? modelRows : [noteRow(emptyModels)]));
 };
 
 const renderStatsError = (retry) => {
@@ -109,7 +128,7 @@ const renderStatsError = (retry) => {
   for (const el of $$(".fact__value")) el.replaceChildren(h("span", { class: "placeholder" }, "-"));
   $('[data-fact="busiestDay"]').textContent = "";
   clear($("[data-activity]")).append(h("p", { class: "muted" }, "The activity chart appears here once live stats load."));
-  $("[data-models]").replaceChildren(h("li", { class: "models__row muted" }, "Unavailable right now."));
+  $("[data-models]").replaceChildren(noteRow("Unavailable right now."));
   for (const share of $$(".tool-row__share")) share.replaceChildren();
   clear($("[data-stats-status]")).append(
     "Live stats could not be loaded. ",
@@ -186,10 +205,6 @@ const renderSignedIn = (me) => {
     openLink(hero, "Open leaderboard");
     $(".hero__actions").after(rankLine(me));
   }
-  const cta = $(".cta [data-signin]");
-  if (cta) openLink(cta, "Open leaderboard");
-  const lead = $(".cta__lead");
-  if (lead) lead.textContent = `You are signed in as @${me.user.login}.`;
 };
 
 const loadSession = async () => {

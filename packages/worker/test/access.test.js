@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { accessPolicy, githubScope, isAllowed, needsOrgs, parseList } from "../src/access.js";
+import { githubScope, isAllowed, needsOrgs, parseList } from "../src/access.js";
 
 const env = (orgs = "", logins = "") => ({ ALLOWED_GITHUB_ORGS: orgs, ALLOWED_GITHUB_LOGINS: logins });
 
@@ -16,12 +16,6 @@ describe("isAllowed", () => {
     expect(isAllowed({ login: "anyone", orgs: [] }, env())).toBe(false);
     expect(isAllowed({ login: "anyone", orgs: [] }, { ...env(), PUBLIC_ACCESS: "1" })).toBe(true);
     expect(isAllowed({ login: "anyone", orgs: [] }, { ...env(), PUBLIC_ACCESS: "yes" })).toBe(false);
-  });
-
-  it("binds the access policy to the public flag", () => {
-    expect(accessPolicy(env())).toBe("");
-    expect(accessPolicy({ ...env(), PUBLIC_ACCESS: "1" })).toBe("public");
-    expect(accessPolicy(env("acme", "ada"))).toBe(JSON.stringify({ orgs: ["acme"], logins: ["ada"] }));
   });
 
   it("requests read:org only when organizations are configured", () => {

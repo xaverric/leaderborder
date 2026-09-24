@@ -55,7 +55,15 @@ describe("security boundaries", () => {
     expect((await call("GET", "/api/me", { headers: { cookie } })).status).toBe(401);
   });
 
-  it("invalidates prior sessions and device tokens when access policy changes", async () => {
+  it("keeps users signed in across configuration changes that still allow them", async () => {
+    const ada = await registerDevice();
+    const cookie = await sessionCookie(await userIdOf("ada"));
+    const changed = { PUBLIC_ACCESS: "", ALLOWED_GITHUB_LOGINS: "ada,linus", ALLOWED_GITHUB_ORGS: "acme" };
+    expect((await call("GET", "/api/me", { headers: { cookie }, env: changed })).status).toBe(200);
+    expect((await call("GET", "/api/me", { headers: bearer(ada.data.token), env: changed })).status).toBe(200);
+  });
+
+  it("rejects prior sessions and device tokens of users who lost access", async () => {
     const ada = await registerDevice();
     const cookie = await sessionCookie(await userIdOf("ada"));
     const restricted = { ALLOWED_GITHUB_LOGINS: "linus" };

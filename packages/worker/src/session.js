@@ -1,5 +1,4 @@
 import { base64urlDecode, base64urlEncode, fromUtf8, utf8 } from "./encoding.js";
-import { accessPolicy } from "./access.js";
 import { createDeviceToken, hashToken, isDeviceTokenFormat } from "./tokens.js";
 
 export const SESSION_COOKIE = "lb_session";
@@ -53,8 +52,8 @@ export const createSession = async (env, uid, nowSec, exp = nowSec + SESSION_MAX
   const value = await signValue({ typ: "session", uid, sid, exp }, env.SESSION_SECRET);
   await env.DB.batch([
     env.DB.prepare("DELETE FROM web_sessions WHERE expires_at <= ?1").bind(nowSec),
-    env.DB.prepare("INSERT INTO web_sessions (token_hash, user_id, expires_at, access_policy) VALUES (?1, ?2, ?3, ?4)")
-      .bind(await hashToken(sid), uid, exp, accessPolicy(env)),
+    env.DB.prepare("INSERT INTO web_sessions (token_hash, user_id, expires_at, access_policy) VALUES (?1, ?2, ?3, '')")
+      .bind(await hashToken(sid), uid, exp),
   ]);
   return value;
 };
@@ -62,8 +61,8 @@ export const createSession = async (env, uid, nowSec, exp = nowSec + SESSION_MAX
 export const findSessionUser = async (env, payload, nowSec) => {
   if (!Number.isSafeInteger(payload?.uid) || !isDeviceTokenFormat(payload?.sid)) return null;
   return env.DB.prepare(`SELECT u.id, u.github_id, u.login, u.name, u.avatar_url, u.orgs FROM web_sessions s JOIN users u ON u.id = s.user_id
-    WHERE s.token_hash = ?1 AND s.user_id = ?2 AND s.expires_at > ?3 AND s.access_policy = ?4 AND u.blocked_at IS NULL`)
-    .bind(await hashToken(payload.sid), payload.uid, nowSec, accessPolicy(env)).first();
+    WHERE s.token_hash = ?1 AND s.user_id = ?2 AND s.expires_at > ?3 AND u.blocked_at IS NULL`)
+    .bind(await hashToken(payload.sid), payload.uid, nowSec).first();
 };
 
 export const revokeSession = async (env, value, nowSec) => {

@@ -1,4 +1,4 @@
-import { accessPolicy, grantsAccess, parseOrgs } from "./access.js";
+import { grantsAccess, parseOrgs } from "./access.js";
 import { loadRules } from "./access-store.js";
 import { cookieName, parseCookies } from "./cookies.js";
 import { HttpError } from "./http.js";
@@ -25,7 +25,7 @@ export const bearerAuth = async (request, env, now) => {
   const token = bearerToken(request);
   if (!isDeviceTokenFormat(token)) return null;
   const auth = await findTokenAuth(env.DB, await hashToken(token), now.toISOString());
-  return auth?.access_policy === accessPolicy(env) ? stillAllowed(auth, env) : null;
+  return stillAllowed(auth, env);
 };
 
 export const requireCookieUser = async (request, env, now) => {
