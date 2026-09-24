@@ -6,6 +6,7 @@ import { metricKey, metricLabel } from "../lib/period.js";
 import { heatmapCellFor, renderBreakdown, renderHeatmap } from "../ui/charts.js";
 import { clear, h, skeleton } from "../ui/dom.js";
 import { renderTrend } from "../ui/trend.js";
+import { githubLink } from "../ui/github.js";
 
 const METRIC_OPTIONS = [
   ["tokens", "Tokens"],
@@ -114,7 +115,7 @@ export const renderUser = (view, ctx, login) => {
             "div",
             { class: "profile__text" },
             h("h1", { class: "view__title" }, name, isMe ? h("span", { class: "tag tag--lg" }, "You") : null),
-            h("p", { class: "muted" }, h("a", { href: `https://github.com/${encodeURIComponent(detail.user.login)}` }, `@${detail.user.login} on GitHub`)),
+            h("p", { class: "profile__links" }, githubLink(detail.user.login, { label: "GitHub profile", className: "btn btn--sm gh-button" }), h("span", { class: "muted" }, `@${detail.user.login}`)),
           ),
           h("div", { class: "profile__metric" }, metricSwitch(metric, (next) => {
             metric = next;
