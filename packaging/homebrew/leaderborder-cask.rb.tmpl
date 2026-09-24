@@ -1,0 +1,38 @@
+cask "leaderborder" do
+  arch arm: "arm64", intel: "x64"
+
+  version "{{VERSION}}"
+  sha256 arm:   "{{DMG_ARM64_SHA256}}",
+         intel: "{{DMG_X64_SHA256}}"
+
+  url "https://github.com/{{REPO}}/releases/download/v#{version}/Leaderborder-#{version}-#{arch}.dmg"
+  name "Leaderborder"
+  desc "Menu bar app that tracks AI coding token usage for a leaderboard"
+  homepage "https://leaderborder.xaverric.cz"
+
+  livecheck do
+    url :url
+    strategy :github_latest
+  end
+
+  depends_on macos: :monterey
+
+  app "Leaderborder.app"
+
+  zap trash: [
+    "~/.config/leaderborder",
+    "~/Library/Application Support/Leaderborder",
+  ]
+
+  caveats <<~EOS
+    Leaderborder is not signed with an Apple Developer ID yet.
+    If macOS refuses to open it, remove the quarantine flag once:
+
+      xattr -dr com.apple.quarantine "#{appdir}/Leaderborder.app"
+
+    or right-click the app in Finder and choose Open.
+
+    The device token lives in the macOS Keychain (service "leaderborder").
+    Log out in the app before uninstalling to remove it.
+  EOS
+end

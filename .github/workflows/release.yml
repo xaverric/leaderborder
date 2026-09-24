@@ -1,0 +1,144 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions: {}
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build release artifacts
+    runs-on: macos-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    env:
+      SIGNING: ${{ secrets.CSC_LINK != '' }}
+      OUT_DIR: release
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Verify tag matches package version
+        id: version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version=$(node -p "require('./packages/client/package.json').version")
+          if [ "$TAG" != "v$version" ]; then
+            echo "::error::Tag $TAG does not match packages/client/package.json version $version"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: node --test "scripts/*.test.js"
+
+      - name: Build DMG arm64 (unsigned)
+        if: env.SIGNING != 'true'
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          VERSION: ${{ steps.version.outputs.version }}
+        run: bash scripts/build-dmg.sh arm64 "$VERSION" "$OUT_DIR"
+      - name: Build DMG arm64 (signed, notarized)
+        if: env.SIGNING == 'true'
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: bash scripts/build-dmg.sh arm64 "$VERSION" "$OUT_DIR"
+
+      - name: Install x64 tokscale binary
+        run: bash scripts/fetch-tokscale-binary.sh x64
+
+      - name: Build DMG x64 (unsigned)
+        if: env.SIGNING != 'true'
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          VERSION: ${{ steps.version.outputs.version }}
+        run: bash scripts/build-dmg.sh x64 "$VERSION" "$OUT_DIR"
+      - name: Build DMG x64 (signed, notarized)
+        if: env.SIGNING == 'true'
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: bash scripts/build-dmg.sh x64 "$VERSION" "$OUT_DIR"
+
+      - name: Pack npm tarball
+        run: npm pack -w leaderborder --pack-destination "$OUT_DIR"
+
+      - name: Render Homebrew formula and cask
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          node scripts/render-homebrew.js \
+            --version "$VERSION" \
+            --tarball "$OUT_DIR/leaderborder-$VERSION.tgz" \
+            --dmg-arm64 "$OUT_DIR/Leaderborder-$VERSION-arm64.dmg" \
+            --dmg-x64 "$OUT_DIR/Leaderborder-$VERSION-x64.dmg" \
+            --out "$OUT_DIR"
+
+      - name: Checksums
+        working-directory: release
+        run: |
+          shasum -a 256 -- *.dmg *.tgz *.rb > SHA256SUMS
+          cat SHA256SUMS >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release
+          path: release/
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Create GitHub Release
+    needs: [build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release
+          path: release
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" release/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$TAG" \
+            --generate-notes \
+            --verify-tag
+
+  deploy:
+    name: Deploy worker
+    needs: [publish]
+    permissions:
+      contents: read
+    uses: ./.github/workflows/deploy.yml
+    secrets: inherit
