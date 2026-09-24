@@ -74,7 +74,7 @@ test("errorMessage maps core codes to friendly copy", () => {
   assert.match(errorMessage({ code: "tokscale_failed", message: "x" }), /local usage/);
   assert.match(errorMessage({ code: "network", message: "x" }), /connection/i);
   assert.match(errorMessage({ code: "upload_failed", message: "x" }), /Upload failed/);
-  assert.match(errorMessage({ code: "forbidden", message: "x" }), /not allowed/);
+  assert.match(errorMessage({ code: "forbidden", message: "x" }), /Access requested/);
   assert.match(errorMessage({ code: "unauthorized", message: "x" }), /expired or was revoked\. Sign in again/);
 });
 

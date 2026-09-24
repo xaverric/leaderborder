@@ -2,6 +2,7 @@ import { api, signInHref } from "./api.js";
 import { parseRoute, routeHref, routeMode } from "./lib/route.js";
 import { clear, h } from "./ui/dom.js";
 import { toast } from "./ui/toast.js";
+import { renderAdmin } from "./views/admin.js";
 import { renderDevices } from "./views/devices.js";
 import { renderLeaderboard } from "./views/leaderboard.js";
 import { renderUser } from "./views/user.js";
@@ -83,6 +84,7 @@ const render = () => {
   if (route.name === "leaderboard") renderLeaderboard(view, ctx);
   else if (route.name === "user") renderUser(view, ctx, route.login);
   else if (route.name === "devices") renderDevices(view, ctx);
+  else if (route.name === "admin" && state.me?.isAdmin) renderAdmin(view, ctx);
   else renderNotFound();
   if (!state.first) {
     view.focus({ preventScroll: true });
@@ -94,6 +96,7 @@ const render = () => {
 const showChrome = (me) => {
   $("[data-nav]").hidden = !me;
   $("[data-me]").hidden = !me;
+  $("[data-admin]").hidden = !me?.isAdmin;
   if (!me) return;
   if (me.user.avatarUrl) $("[data-me-avatar]").src = me.user.avatarUrl;
   $("[data-me-name]").textContent = me.user.name ?? me.user.login;
