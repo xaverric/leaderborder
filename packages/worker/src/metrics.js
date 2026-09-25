@@ -4,17 +4,18 @@ export const METRIC_SQL = {
   tokens: "ud.input + ud.output + ud.cache_read + ud.cache_write",
   tokens_nocache: "ud.input + ud.output",
   cost: "ud.cost_usd",
+  model_time: "ud.gen_ms",
 };
 
-export const METRICS = Object.keys(METRIC_SQL);
+export const ACTIVITY_METRIC_SQL = { prompts: "ca.prompts" };
+
+export const METRICS = [...Object.keys(METRIC_SQL), ...Object.keys(ACTIVITY_METRIC_SQL)];
 
 export const roundCost = (value) => Math.round((value ?? 0) * 1e6) / 1e6;
 
 export const metricValue = (metric, value) => (metric === "cost" ? roundCost(value) : (value ?? 0));
 
 const totalsOf = (row) => ({ tokens: row.tokens ?? 0, tokensNoCache: row.tokens_nocache ?? 0, costUsd: roundCost(row.cost_usd) });
-
-const pickMetric = { tokens: (t) => t.tokens, tokens_nocache: (t) => t.tokensNoCache, cost: (t) => t.costUsd };
 
 export const rankEntries = (items) => {
   const sorted = [...items].sort((a, b) => b.value - a.value || a.login.localeCompare(b.login));
@@ -40,7 +41,7 @@ const groupBy = (rows, key) => {
 };
 
 export const toRankedTotals = (metric, totals) =>
-  rankEntries(totals.map((row) => ({ id: row.id, login: row.login, row, ...totalsOf(row), value: pickMetric[metric](totalsOf(row)) })));
+  rankEntries(totals.map((row) => ({ id: row.id, login: row.login, row, ...totalsOf(row), value: metricValue(metric, row.value) })));
 
 export const buildLeaderboard = ({ period, metric, range, sparkStart, totals, byClient, daily, clients, models }) => {
   const clientsByUser = groupBy(byClient, "user_id");

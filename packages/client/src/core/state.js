@@ -6,6 +6,7 @@ export const defaultState = () => ({
   deviceId: null,
   deviceName: null,
   lastSyncAt: null,
+  lastActivityAt: null,
   lastError: null,
   summary: null,
 });

@@ -22,7 +22,7 @@ export const putUsage = async ({ request, env, body, now }) => {
     throw new HttpError(400, "invalid_request", `rows: more than ${MAX_PAIRS_PER_DEVICE} distinct client and model combinations for this device`);
   }
   if (existing.total + body.rows.length > MAX_ROWS_PER_DEVICE) throw new HttpError(400, "invalid_request", "rows: device storage quota exceeded");
-  const results = await upsertUsage(env.DB, { deviceId: auth.device_id, tokenId: auth.token_id, rows: body.rows, nowIso: now.toISOString() });
+  const results = await upsertUsage(env.DB, { deviceId: auth.device_id, tokenId: auth.token_id, rows: body.rows, activity: body.activity, nowIso: now.toISOString() });
   if (results[0].meta.changes !== 1) throw new HttpError(401, "unauthorized", "Device token revoked");
   return json({ upserted: body.rows.length });
 };

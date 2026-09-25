@@ -8,6 +8,7 @@ import {
   tokscaleBin,
   runTokscale,
   readGraph,
+  readReport,
   cursorStatus,
   cursorSync,
   cursorLogin,
@@ -95,6 +96,10 @@ test("runTokscale refuses commands outside the allowlist before spawning", async
     ["cursor"],
     ["--version", "--help"],
     ["--help"],
+    ["models"],
+    ["hourly", "--since", "2026-09-01"],
+    ["time-metrics"],
+    ["tui", "--json"],
     [],
   ];
   for (const args of refused) {
@@ -117,6 +122,54 @@ test("runTokscale allows --version, graph and the cursor status, sync and login 
     await runTokscale(args, { bin: "/bin/tokscale", execFile });
   }
   assert.equal(seen.length, 5);
+});
+
+test("runTokscale allows the models, hourly and time-metrics reports only as JSON, which never opens the TUI", async () => {
+  const seen = [];
+  const execFile = (file, args, options, callback) => {
+    seen.push(args[0]);
+    callback(null, "{}", "");
+  };
+  for (const command of ["models", "hourly", "time-metrics"]) {
+    await runTokscale([command, "--json", "--no-spinner"], { bin: "/bin/tokscale", execFile });
+  }
+  assert.deepEqual(seen, ["models", "hourly", "time-metrics"]);
+});
+
+test("readReport builds a local JSON report command and parses stdout", async () => {
+  const calls = [];
+  const run = async (args) => {
+    calls.push(args);
+    return { stdout: '{"entries":[]}', stderr: "progress" };
+  };
+  const report = await readReport(
+    "models",
+    { since: "2026-09-10", until: "2026-09-10", clients: ["claude", "codex"], home: "/fixtures/home", extra: ["--group-by", "client,model"] },
+    { run },
+  );
+  assert.deepEqual(report, { entries: [] });
+  assert.deepEqual(calls[0], [
+    "models", "--json", "--no-spinner", "--since", "2026-09-10", "--until", "2026-09-10",
+    "--group-by", "client,model", "--client", "claude,codex", "--home", "/fixtures/home",
+  ]);
+});
+
+test("readReport omits an empty client filter", async () => {
+  const calls = [];
+  const run = async (args) => {
+    calls.push(args);
+    return { stdout: "{}" };
+  };
+  await readReport("time-metrics", { since: "2026-09-10", until: "2026-09-11" }, { run });
+  assert.deepEqual(calls[0], ["time-metrics", "--json", "--no-spinner", "--since", "2026-09-10", "--until", "2026-09-11"]);
+});
+
+test("readReport rejects unreadable or non-object output with tokscale_failed", async () => {
+  const options = { since: "2026-09-10", until: "2026-09-10" };
+  await rejectsWithCode(readReport("hourly", options, { run: async () => ({ stdout: "not json" }) }), "tokscale_failed");
+  await rejectsWithCode(readReport("hourly", options, { run: async () => ({ stdout: "[]" }) }), "tokscale_failed");
+  const failure = Object.assign(new Error("x"), { code: "tokscale_failed" });
+  await assert.rejects(readReport("hourly", options, { run: async () => { throw failure; } }), (error) => error === failure || error.code === "tokscale_failed");
 });
 
 test("childEnv strips Node and tokscale credential variables and forces NO_COLOR", () => {

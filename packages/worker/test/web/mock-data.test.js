@@ -59,12 +59,29 @@ describe("mock api matches Contract 3", () => {
 
   it("serves user detail", () => {
     const { body } = api.handle("GET", "/api/users/grace");
-    expect(keys(body)).toEqual(["byClientModel", "daily", "devices", "totals", "user"]);
+    expect(keys(body)).toEqual(["activity", "byClientModel", "daily", "devices", "totals", "usage", "user"]);
     expect(keys(body.totals)).toEqual(["activeDays", "costUsd", "messages", "tokens", "tokensNoCache"]);
     expect(body.daily.length).toBeLessThanOrEqual(365);
     expect(keys(body.daily[0])).toEqual(["costUsd", "day", "tokens", "tokensNoCache"]);
     expect(keys(body.byClientModel[0])).toEqual(["client", "costUsd", "model", "tokens", "tokensNoCache"]);
     expect(keys(body.devices[0])).toEqual(["lastSyncAt", "name"]);
+    expect(keys(body.usage[0])).toEqual(["client", "costUsd", "day", "genMs", "messages", "model", "tokens", "tokensNoCache"]);
+    expect(body.usage.every((row) => row.day > "2025-09-24")).toBe(true);
+    expect(body.usage.filter((row) => row.client === "cursor").every((row) => row.genMs === null)).toBe(true);
+    expect(keys(body.activity)).toEqual(["clients", "days"]);
+    expect(keys(body.activity.days[0])).toEqual(["activeMs", "day", "longestMs", "maxConcurrent", "sessions"]);
+    expect(keys(body.activity.clients[0])).toEqual(["client", "day", "hours", "prompts"]);
+    expect(body.activity.clients[0].hours).toHaveLength(24);
+    expect(body.activity.clients.some((row) => row.client === "cursor")).toBe(false);
+  });
+
+  it("ranks model time and prompts", () => {
+    const time = api.handle("GET", "/api/leaderboard?period=month&metric=model_time").body;
+    expect(time.entries.length).toBeGreaterThan(0);
+    expect(time.entries.every((e) => !("cursor" in e.byClient))).toBe(true);
+    const prompts = api.handle("GET", "/api/leaderboard?period=month&metric=prompts&model=gpt-5.2").body;
+    const unfiltered = api.handle("GET", "/api/leaderboard?period=month&metric=prompts").body;
+    expect(prompts.entries.map((e) => e.value)).toEqual(unfiltered.entries.map((e) => e.value));
   });
 
   it("returns error envelopes", () => {

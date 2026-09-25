@@ -10,10 +10,14 @@ const DEFAULT_TIMEOUT_MS = 120000;
 const MAX_BUFFER = 64 * 1024 * 1024;
 const STRIPPED_ENV = new Set(["NODE_OPTIONS", "ELECTRON_RUN_AS_NODE", "NODE_TLS_REJECT_UNAUTHORIZED", "TOKSCALE_API_TOKEN"]);
 const CURSOR_SUBCOMMANDS = new Set(["status", "sync", "login"]);
+const REPORT_COMMANDS = new Set(["models", "hourly", "time-metrics"]);
 
 const isAllowed = (args) =>
   Array.isArray(args) &&
-  ((args.length === 1 && args[0] === "--version") || args[0] === "graph" || (args[0] === "cursor" && CURSOR_SUBCOMMANDS.has(args[1])));
+  ((args.length === 1 && args[0] === "--version") ||
+    args[0] === "graph" ||
+    (REPORT_COMMANDS.has(args[0]) && args.includes("--json")) ||
+    (args[0] === "cursor" && CURSOR_SUBCOMMANDS.has(args[1])));
 
 export const childEnv = (env = process.env) => ({
   ...Object.fromEntries(Object.entries(env).filter(([key]) => !STRIPPED_ENV.has(key))),
@@ -49,10 +53,35 @@ const graphArgs = ({ since, home, output }) => [
   output,
 ];
 
-const parseGraph = (text) => {
-  const graph = JSON.parse(text);
-  if (!graph || typeof graph !== "object" || Array.isArray(graph)) throw new Error("graph output is not an object");
-  return graph;
+const parseObject = (text, command) => {
+  const value = JSON.parse(text);
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`${command} output is not an object`);
+  return value;
+};
+
+const parseGraph = (text) => parseObject(text, "graph");
+
+const reportArgs = (command, { since, until, clients = [], home, extra = [] }) => [
+  command,
+  "--json",
+  "--no-spinner",
+  "--since",
+  since,
+  "--until",
+  until,
+  ...extra,
+  ...(clients.length ? ["--client", clients.join(",")] : []),
+  ...(home ? ["--home", home] : []),
+];
+
+export const readReport = async (command, options, { run = runTokscale } = {}) => {
+  try {
+    const { stdout } = await run(reportArgs(command, options));
+    return parseObject(stdout, command);
+  } catch (cause) {
+    if (cause instanceof LeaderborderError) throw cause;
+    throw new LeaderborderError("tokscale_failed", `tokscale ${command} output unreadable: ${cause.message}`, { cause });
+  }
 };
 
 export const readGraph = async ({ since = null, home } = {}, { run = runTokscale, tmpdir = osTmpdir } = {}) => {

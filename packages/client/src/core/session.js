@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
+import { activityWindow, collectActivity } from "./activity.js";
 import { createApi } from "./api.js";
 import { getConfig } from "./config.js";
 import { defaultDeviceName, parseDeviceName } from "./device.js";
@@ -8,7 +9,7 @@ import { githubDeviceFlow } from "./github.js";
 import { keychain } from "./keychain.js";
 import { chunk, summarize, syncWindow, toUsageRows } from "./rows.js";
 import { loadState, saveState } from "./state.js";
-import { cursorStatus, cursorSync, readGraph } from "./tokscale.js";
+import { cursorStatus, cursorSync, readGraph, readReport } from "./tokscale.js";
 
 export const RETRY_DELAYS_MS = [1000, 4000, 16000];
 
@@ -29,6 +30,7 @@ const defaultDeps = {
   cursorStatus,
   cursorSync,
   readGraph,
+  readReport,
   sleep: (ms) => delay(ms),
 };
 
@@ -94,6 +96,7 @@ export const login = async ({ onCode = () => {}, fetch, apiUrl, deviceName: requ
     deviceId: registered.deviceId,
     deviceName,
     lastSyncAt: null,
+    lastActivityAt: null,
     lastError: null,
   });
   return { user: registered.user };
@@ -115,7 +118,7 @@ export const logout = async ({ fetch, apiUrl, deps } = {}) => {
   const config = configFor(d, apiUrl);
   const revoked = await revokeToken(d, config, fetch);
   await d.keychain.deleteToken(config);
-  d.saveState(config, { ...d.loadState(config), deviceId: null, lastSyncAt: null, lastError: null, summary: null });
+  d.saveState(config, { ...d.loadState(config), deviceId: null, lastSyncAt: null, lastActivityAt: null, lastError: null, summary: null });
   return { revoked };
 };
 
@@ -136,12 +139,13 @@ const credentials = async (d, state, config) => {
   return token;
 };
 
-const upload = async (d, { api, config, deviceId, tokscaleVersion, rows, onProgress }) => {
+const upload = async (d, { api, config, deviceId, tokscaleVersion, rows, activity, onProgress }) => {
   const batches = chunk(rows);
   for (const [index, batch] of batches.entries()) {
     onProgress({ phase: "upload", done: index, total: batches.length });
+    const extra = index === 0 && activity.length ? { activity } : {};
     try {
-      await withRetry(() => api.putUsage({ deviceId, tokscaleVersion, rows: batch }), { sleep: d.sleep });
+      await withRetry(() => api.putUsage({ deviceId, tokscaleVersion, rows: batch, ...extra }), { sleep: d.sleep });
     } catch (error) {
       if (error?.code !== "unauthorized") throw error;
       await d.keychain.deleteToken(config);
@@ -150,12 +154,23 @@ const upload = async (d, { api, config, deviceId, tokscaleVersion, rows, onProgr
   }
 };
 
+const measureActivity = async (d, { rows, state, now, onProgress }) => {
+  const window = activityWindow({ lastActivityAt: state.lastActivityAt, now });
+  onProgress({ phase: "activity", since: window.since });
+  try {
+    return { ...(await collectActivity({ rows, window }, { report: d.readReport })), measured: true, warnings: [] };
+  } catch (error) {
+    return { rows, activity: [], measured: false, warnings: [`Activity metrics skipped: ${error.message}`] };
+  }
+};
+
 const collect = async (d, { state, now, onProgress }) => {
-  const warnings = await syncCursor(d, onProgress);
+  const cursorWarnings = await syncCursor(d, onProgress);
   const { since } = syncWindow({ lastSyncAt: state.lastSyncAt, now });
   onProgress({ phase: "graph", since });
   const graph = await d.readGraph({ since });
-  return { warnings, since, graph, rows: toUsageRows(graph, now) };
+  const { rows, activity, measured, warnings } = await measureActivity(d, { rows: toUsageRows(graph, now), state, now, onProgress });
+  return { warnings: [...cursorWarnings, ...warnings], since, graph, rows, activity, measured };
 };
 
 export const sync = async ({ now = new Date(), fetch, apiUrl, onProgress = () => {}, dryRun = false, deps } = {}) => {
@@ -163,19 +178,20 @@ export const sync = async ({ now = new Date(), fetch, apiUrl, onProgress = () =>
   const config = configFor(d, apiUrl);
   const state = d.loadState(config);
   if (dryRun) {
-    const { warnings, since, rows } = await collect(d, { state, now, onProgress });
+    const { warnings, since, rows, activity } = await collect(d, { state, now, onProgress });
     onProgress({ phase: "done" });
-    return { rows, since, summary: summarize(rows, now), warnings, uploaded: 0 };
+    return { rows, activity, since, summary: summarize(rows, now), warnings, uploaded: 0 };
   }
   try {
     const token = await credentials(d, state, config);
-    const { warnings, since, graph, rows } = await collect(d, { state, now, onProgress });
+    const { warnings, since, graph, rows, activity, measured } = await collect(d, { state, now, onProgress });
     const api = d.createApi({ apiUrl: config.apiUrl, fetch, token });
-    await upload(d, { api, config, deviceId: state.deviceId, tokscaleVersion: graph.meta?.version ?? "unknown", rows, onProgress });
+    await upload(d, { api, config, deviceId: state.deviceId, tokscaleVersion: graph.meta?.version ?? "unknown", rows, activity, onProgress });
     const summary = summarize(rows, now);
-    d.saveState(config, { ...d.loadState(config), lastSyncAt: now.toISOString(), summary, lastError: null });
+    const lastActivityAt = measured ? now.toISOString() : state.lastActivityAt;
+    d.saveState(config, { ...d.loadState(config), lastSyncAt: now.toISOString(), lastActivityAt, summary, lastError: null });
     onProgress({ phase: "done" });
-    return { rows, since, summary, warnings, uploaded: rows.length };
+    return { rows, activity, since, summary, warnings, uploaded: rows.length };
   } catch (error) {
     d.saveState(config, { ...d.loadState(config), lastError: errorRecord(error, now) });
     throw error;

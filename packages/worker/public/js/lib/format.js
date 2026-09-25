@@ -39,7 +39,26 @@ export const formatUsd = (n) => {
 
 export const formatInteger = (n) => (isNumber(n) ? integer.format(n) : "-");
 
-export const formatMetric = (metric, value) => (metric === "cost" ? formatUsd(value) : formatCompact(value));
+const decimal = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
+
+export const formatDecimal = (n) => (isNumber(n) ? decimal.format(n) : "-");
+
+export const formatDuration = (ms) => {
+  if (!isNumber(ms) || ms < 0) return "-";
+  const seconds = Math.round(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.round(ms / 60000);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest && hours < 100 ? `${hours}h ${rest}m` : `${hours}h`;
+};
+
+export const formatMetric = (metric, value) => {
+  if (metric === "cost") return formatUsd(value);
+  if (metric === "model_time") return formatDuration(value);
+  return formatCompact(value);
+};
 
 const dayFull = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 const dayShort = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });

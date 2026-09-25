@@ -1,6 +1,6 @@
 import uPlot from "/vendor/uPlot.esm.js";
 import { dayRange } from "../lib/dates.js";
-import { formatCompact, formatDay, formatMetric, formatUsd } from "../lib/format.js";
+import { formatCompact, formatDay, formatDuration, formatMetric, formatUsd } from "../lib/format.js";
 import { metricKey } from "../lib/period.js";
 import { h } from "./dom.js";
 
@@ -27,7 +27,7 @@ const tooltipPlugin = (metric, tip) => ({
         tip.hidden = true;
         return;
       }
-      const day = new Date(u.data[0][index] * 1000).toISOString().slice(0, 10);
+      const day = dayAt(u, index);
       tip.replaceChildren(h("span", { class: "trend__tip-day" }, formatDay(day)), h("strong", { class: "tnum" }, formatMetric(metric, u.data[1][index])));
       tip.hidden = false;
       const x = u.valToPos(u.data[0][index], "x");
@@ -37,7 +37,9 @@ const tooltipPlugin = (metric, tip) => ({
   },
 });
 
-export const renderTrend = (container, daily, { metric, end, days = 365 }) => {
+const dayAt = (u, index) => new Date(u.data[0][index] * 1000).toISOString().slice(0, 10);
+
+export const renderTrend = (container, daily, { metric, end, days = 365, onSelect = null }) => {
   const key = metricKey(metric);
   const byDay = new Map(daily.map((row) => [row.day, row[key]]));
   const range = dayRange(end, days);
@@ -66,7 +68,7 @@ export const renderTrend = (container, daily, { metric, end, days = 365 }) => {
       scales: { x: { time: true }, y: { range: (u, min, max) => [0, max > 0 ? max * 1.1 : 1] } },
       axes: [
         { ...axis, grid: { show: false }, space: 64 },
-        { ...axis, side: 1, size: 56, values: (u, ticks) => ticks.map((v) => (metric === "cost" ? formatUsd(v) : formatCompact(v))) },
+        { ...axis, side: 1, size: 56, values: (u, ticks) => ticks.map((v) => (metric === "cost" ? formatUsd(v) : metric === "model_time" ? formatDuration(v) : formatCompact(v))) },
       ],
       series: [{}, { stroke: rgba(line), width: 2, fill: rgba(line, 0.1), points: { show: false } }],
       plugins: [tooltipPlugin(metric, tip)],
@@ -75,6 +77,13 @@ export const renderTrend = (container, daily, { metric, end, days = 365 }) => {
     plotHost,
   );
   plot.over.append(tip);
+  if (onSelect) {
+    plot.over.classList.add("trend__over--select");
+    plot.over.addEventListener("click", () => {
+      const index = plot.cursor.idx;
+      if (index !== null && index !== undefined) onSelect(dayAt(plot, index));
+    });
+  }
 
   const observer = new ResizeObserver(() => plot.setSize(size()));
   observer.observe(plotHost);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isUuidV4, safeNext, validateDeviceBody, validateRow, validateUsageBody } from "../src/validate.js";
+import { isUuidV4, safeNext, validateActivity, validateDeviceBody, validateRow, validateUsageBody } from "../src/validate.js";
 
 const now = new Date("2026-09-24T12:00:00Z");
 const uuid = "3f2b8c1e-5d4a-4b6f-9a8e-1c2d3e4f5a6b";
@@ -66,6 +66,76 @@ describe("validateRow", () => {
 
   it.each([[null], ["x"], [[]], [7]])("rejects non-object row %s", (value) => {
     expect(validateRow(value, now)).toBe("row: must be an object");
+  });
+
+  it("accepts model time only together with its sample count", () => {
+    expect(validateRow(row({ genMs: 5000, genSamples: 2 }), now)).toBeNull();
+    expect(validateRow(row({ genMs: 0, genSamples: 0 }), now)).toBeNull();
+    expect(validateRow(row({ genMs: 5000 }), now)).toBe("genMs: must be sent together with genSamples");
+    expect(validateRow(row({ genSamples: 2 }), now)).toBe("genMs: must be sent together with genSamples");
+  });
+
+  it("rejects bad model time values", () => {
+    for (const genMs of [-1, 1.5, "1", null, 31 * 86400000 + 1]) expect(validateRow(row({ genMs, genSamples: 1 }), now)).toMatch(/^genMs/);
+    for (const genSamples of [-1, 1.5, "1", null]) expect(validateRow(row({ genMs: 1, genSamples }), now)).toMatch(/^genSamples/);
+  });
+});
+
+describe("validateActivity", () => {
+  const hours = () => Array.from({ length: 24 }, () => [0, 0, 0]);
+  const client = (overrides = {}) => ({ client: "claude", prompts: 3, hours: hours(), ...overrides });
+  const day = (overrides = {}) => ({ day: "2026-09-20", activeMs: 60000, longestMs: 50000, sessions: 2, maxConcurrent: 2, clients: [client()], ...overrides });
+
+  it("accepts valid activity and an empty list", () => {
+    expect(validateActivity([day(), day({ day: "2026-09-21", clients: [] })], now)).toBeNull();
+    expect(validateActivity([], now)).toBeNull();
+  });
+
+  it("rejects non-arrays and more than 62 days", () => {
+    expect(validateActivity({}, now)).toMatch(/^activity:/);
+    const days = Array.from({ length: 63 }, (_, i) => day({ day: new Date(Date.UTC(2026, 6, 1 + i)).toISOString().slice(0, 10) }));
+    expect(validateActivity(days, now)).toMatch(/^activity:/);
+  });
+
+  it("rejects days in the future, older than 400 days, invalid or duplicate", () => {
+    expect(validateActivity([day({ day: "2026-09-26" })], now)).toBe("activity[0].day: more than 1 day in the future");
+    expect(validateActivity([day({ day: "2025-08-19" })], now)).toBe("activity[0].day: more than 400 days ago");
+    expect(validateActivity([day({ day: "2026-02-30" })], now)).toBe("activity[0].day: invalid date");
+    expect(validateActivity([day(), day()], now)).toBe("activity: duplicate day");
+    expect(validateActivity([null], now)).toBe("activity[0].entry: must be an object");
+  });
+
+  it.each(["activeMs", "longestMs", "sessions", "maxConcurrent"])("rejects a bad %s", (field) => {
+    for (const value of [-1, 1.5, "1", null]) expect(validateActivity([day({ [field]: value })], now)).toMatch(new RegExp(`^activity\\[0\\]\\.${field}`));
+  });
+
+  it("rejects durations longer than 31 days", () => {
+    expect(validateActivity([day({ activeMs: 31 * 86400000 + 1 })], now)).toMatch(/^activity\[0\]\.activeMs/);
+  });
+
+  it("rejects bad tools", () => {
+    expect(validateActivity([day({ clients: "x" })], now)).toMatch(/^activity\[0\]\.clients:/);
+    expect(validateActivity([day({ clients: Array.from({ length: 21 }, (_, i) => client({ client: `c${i}` })) })], now)).toMatch(/^activity\[0\]\.clients:/);
+    expect(validateActivity([day({ clients: [client(), client()] })], now)).toBe("activity[0].clients: duplicate client");
+    expect(validateActivity([day({ clients: [client({ client: "Bad" })] })], now)).toBe("activity[0].clients[0].client: invalid");
+    expect(validateActivity([day({ clients: [client({ prompts: -1 })] })], now)).toMatch(/^activity\[0\]\.clients\[0\]\.prompts/);
+    expect(validateActivity([day({ clients: [7] })], now)).toBe("activity[0].clients[0].client: must be an object");
+  });
+
+  it.each([
+    ["23 hours", () => hours().slice(1)],
+    ["25 hours", () => [...hours(), [0, 0, 0]]],
+    ["a short bucket", () => hours().with(3, [1, 2])],
+    ["a negative value", () => hours().with(3, [1, -2, 0])],
+    ["a fraction", () => hours().with(3, [1.5, 0, 0])],
+  ])("rejects hours with %s", (_, make) => {
+    expect(validateActivity([day({ clients: [client({ hours: make() })] })], now)).toMatch(/^activity\[0\]\.clients\[0\]\.hours/);
+  });
+
+  it("is checked as part of the usage body", () => {
+    const body = { deviceId: uuid, rows: [row()], activity: [day({ sessions: -1 })] };
+    expect(validateUsageBody(body, now)).toMatch(/^activity\[0\]\.sessions/);
+    expect(validateUsageBody({ ...body, activity: undefined }, now)).toBeNull();
   });
 });
 

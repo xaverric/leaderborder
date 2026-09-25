@@ -1,8 +1,17 @@
 import { requireCookieUser } from "../auth.js";
 import { HttpError, json } from "../http.js";
-import { METRIC_SQL, METRICS, buildLeaderboard } from "../metrics.js";
+import { ACTIVITY_METRIC_SQL, METRIC_SQL, METRICS, buildLeaderboard } from "../metrics.js";
 import { PERIODS, addDays, periodRange } from "../periods.js";
-import { distinctValues, leaderboardByClient, leaderboardDaily, leaderboardTotals, minUsageDay } from "../queries.js";
+import {
+  activityLeaderboardByClient,
+  activityLeaderboardDaily,
+  activityLeaderboardTotals,
+  distinctValues,
+  leaderboardByClient,
+  leaderboardDaily,
+  leaderboardTotals,
+  minUsageDay,
+} from "../queries.js";
 
 const MAX_FILTER_LENGTH = 120;
 
@@ -25,14 +34,30 @@ export const resolveRange = async (db, period, now, tz) => {
   return range.start ? range : { start: (await minUsageDay(db)) ?? range.end, end: range.end };
 };
 
+const usageQueries = (db, { metric, range, sparkStart, client, model }) => {
+  const metricSql = METRIC_SQL[metric];
+  return [
+    leaderboardTotals(db, { ...range, client, model, metricSql }),
+    leaderboardByClient(db, { ...range, client, model, metricSql }),
+    leaderboardDaily(db, { start: sparkStart, end: range.end, client, model, metricSql }),
+  ];
+};
+
+const activityQueries = (db, { metric, range, sparkStart, client }) => {
+  const metricSql = ACTIVITY_METRIC_SQL[metric];
+  return [
+    activityLeaderboardTotals(db, { ...range, client, metricSql }),
+    activityLeaderboardByClient(db, { ...range, client, metricSql }),
+    activityLeaderboardDaily(db, { start: sparkStart, end: range.end, client, metricSql }),
+  ];
+};
+
 export const computeLeaderboard = async (db, { period, metric, client = null, model = null, now, tz }) => {
   const range = await resolveRange(db, period, now, tz);
   const sparkStart = addDays(range.end, -29);
-  const metricSql = METRIC_SQL[metric];
+  const queries = metric in ACTIVITY_METRIC_SQL ? activityQueries : usageQueries;
   const [totals, byClient, daily, clients, models] = await Promise.all([
-    leaderboardTotals(db, { ...range, client, model }),
-    leaderboardByClient(db, { ...range, client, model, metricSql }),
-    leaderboardDaily(db, { start: sparkStart, end: range.end, client, model, metricSql }),
+    ...queries(db, { metric, range, sparkStart, client, model }),
     distinctValues(db, "client"),
     distinctValues(db, "model"),
   ]);
