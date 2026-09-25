@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cleanText, formatNumber, formatUsd, formatRowsTable, formatStatus } from "../../src/cli/format.js";
+import { cleanText, formatActivityTables, formatNumber, formatUsd, formatRowsTable, formatStatus } from "../../src/cli/format.js";
 
 const ANSI = "\u001b[31mred\u001b[0m";
 
@@ -48,6 +48,22 @@ test("formatRowsTable prints a header and aligned rows", () => {
 
 test("formatRowsTable handles no rows", () => {
   assert.equal(formatRowsTable([]), "No usage rows.");
+});
+
+test("formatRowsTable adds model time columns when rows carry them", () => {
+  const lines = formatRowsTable([{ ...row, genMs: 5000, genSamples: 2 }, { ...row, client: "cursor" }]).split("\n");
+  assert.match(lines[0], /messages\s+genMs\s+genSamples$/);
+  assert.match(lines[1], /\s7\s+5,000\s+2$/);
+  assert.match(lines[2], /\s7\s+-\s+-$/);
+});
+
+test("formatActivityTables prints day totals and prompts with non-empty hours per tool", () => {
+  const hours = Array.from({ length: 24 }, (_, hour) => (hour === 14 ? [3380, 2, 1] : [0, 0, 0]));
+  const text = formatActivityTables([{ day: "2026-09-10", activeMs: 67000, longestMs: 65000, sessions: 2, maxConcurrent: 2, clients: [{ client: "claude", prompts: 1, hours }] }]);
+  assert.match(text, /^day\s+activeMs\s+longestMs\s+sessions\s+maxConcurrent$/m);
+  assert.match(text, /^2026-09-10\s+67,000\s+65,000\s+2\s+2$/m);
+  assert.match(text, /^2026-09-10\s+claude\s+1\s+14h 3380\/2\/1$/m);
+  assert.equal(formatActivityTables([]), "No activity measured.");
 });
 
 test("formatStatus describes a logged out device", () => {

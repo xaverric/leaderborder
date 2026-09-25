@@ -65,8 +65,8 @@ export const createApi = ({ apiUrl, fetch = globalThis.fetch, token } = {}) => {
     getConfig: () => request("GET", "/api/config"),
     registerDevice: ({ githubToken, deviceId, deviceName }) =>
       request("POST", "/api/devices", { body: { githubToken, deviceId, deviceName } }),
-    putUsage: ({ deviceId, tokscaleVersion, rows }) =>
-      request("PUT", "/api/usage", { body: { deviceId, tokscaleVersion, rows }, auth: true }),
+    putUsage: ({ deviceId, tokscaleVersion, rows, activity }) =>
+      request("PUT", "/api/usage", { body: { deviceId, tokscaleVersion, rows, ...(activity ? { activity } : {}) }, auth: true }),
     getMe: () => request("GET", "/api/me", { auth: true }),
     revokeSelf: () => request("DELETE", "/api/me/devices/self", { auth: true }),
   };

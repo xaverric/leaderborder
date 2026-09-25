@@ -44,7 +44,11 @@ export const call = async (method, path, { body, headers = {}, env: envOverrides
 };
 
 export const resetDb = () =>
-  env.DB.batch(["web_sessions", "usage_daily", "api_tokens", "devices", "users", "access_rules", "access_requests", "settings"].map((table) => env.DB.prepare(`DELETE FROM ${table}`)));
+  env.DB.batch(
+    ["web_sessions", "usage_daily", "activity_daily", "client_activity_daily", "api_tokens", "devices", "users", "access_rules", "access_requests", "settings"].map((table) =>
+      env.DB.prepare(`DELETE FROM ${table}`),
+    ),
+  );
 
 export const sessionCookie = async (uid, exp = Math.floor(Date.now() / 1000) + 3600) =>
   `${cookieName(SESSION_COOKIE, makeEnv())}=${await createSession(makeEnv(), uid, Math.floor(Date.now() / 1000), exp)}`;

@@ -58,20 +58,44 @@ export const findTokenAuth = (db, tokenHash, nowIso) =>
     .bind(tokenHash, nowIso)
     .first();
 
-const UPSERT_USAGE = `INSERT INTO usage_daily (device_id, day, client, model, input, output, cache_read, cache_write, reasoning, cost_usd, messages, updated_at)
-  SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12
+const UPSERT_USAGE = `INSERT INTO usage_daily (device_id, day, client, model, input, output, cache_read, cache_write, reasoning, cost_usd, messages, updated_at, gen_ms, gen_samples)
+  SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?14, ?15
   WHERE EXISTS (SELECT 1 FROM api_tokens t JOIN devices d ON d.id = t.device_id
     WHERE t.id = ?13 AND t.device_id = ?1 AND t.revoked_at IS NULL AND d.revoked_at IS NULL)
   ON CONFLICT (device_id, day, client, model) DO UPDATE SET
     input = excluded.input, output = excluded.output, cache_read = excluded.cache_read, cache_write = excluded.cache_write,
-    reasoning = excluded.reasoning, cost_usd = excluded.cost_usd, messages = excluded.messages, updated_at = excluded.updated_at`;
+    reasoning = excluded.reasoning, cost_usd = excluded.cost_usd, messages = excluded.messages, updated_at = excluded.updated_at,
+    gen_ms = COALESCE(excluded.gen_ms, usage_daily.gen_ms), gen_samples = COALESCE(excluded.gen_samples, usage_daily.gen_samples)`;
 
-export const upsertUsage = (db, { deviceId, tokenId, rows, nowIso }) => {
+const VALID_TOKEN = `EXISTS (SELECT 1 FROM api_tokens t JOIN devices d ON d.id = t.device_id
+    WHERE t.id = ?2 AND t.device_id = ?1 AND t.revoked_at IS NULL AND d.revoked_at IS NULL)`;
+
+const UPSERT_ACTIVITY = `INSERT INTO activity_daily (device_id, day, active_ms, longest_ms, sessions, max_concurrent, updated_at)
+  SELECT ?1, ?4, ?5, ?6, ?7, ?8, ?3 WHERE ${VALID_TOKEN}
+  ON CONFLICT (device_id, day) DO UPDATE SET
+    active_ms = excluded.active_ms, longest_ms = excluded.longest_ms, sessions = excluded.sessions,
+    max_concurrent = excluded.max_concurrent, updated_at = excluded.updated_at`;
+
+const UPSERT_CLIENT_ACTIVITY = `INSERT INTO client_activity_daily (device_id, day, client, prompts, hours, updated_at)
+  SELECT ?1, ?4, ?5, ?6, ?7, ?3 WHERE ${VALID_TOKEN}
+  ON CONFLICT (device_id, day, client) DO UPDATE SET prompts = excluded.prompts, hours = excluded.hours, updated_at = excluded.updated_at`;
+
+const activityStatements = (db, { deviceId, tokenId, activity, nowIso }) => {
+  const upsertDay = db.prepare(UPSERT_ACTIVITY);
+  const upsertClient = db.prepare(UPSERT_CLIENT_ACTIVITY);
+  return activity.flatMap((a) => [
+    upsertDay.bind(deviceId, tokenId, nowIso, a.day, a.activeMs, a.longestMs, a.sessions, a.maxConcurrent),
+    ...a.clients.map((c) => upsertClient.bind(deviceId, tokenId, nowIso, a.day, c.client, c.prompts, JSON.stringify(c.hours))),
+  ]);
+};
+
+export const upsertUsage = (db, { deviceId, tokenId, rows, activity = [], nowIso }) => {
   const upsert = db.prepare(UPSERT_USAGE);
   return db.batch([
     ...rows.map((r) =>
-      upsert.bind(deviceId, r.day, r.client, r.model, r.input, r.output, r.cacheRead, r.cacheWrite, r.reasoning, r.costUsd, r.messages, nowIso, tokenId),
+      upsert.bind(deviceId, r.day, r.client, r.model, r.input, r.output, r.cacheRead, r.cacheWrite, r.reasoning, r.costUsd, r.messages, nowIso, tokenId, r.genMs ?? null, r.genSamples ?? null),
     ),
+    ...activityStatements(db, { deviceId, tokenId, activity, nowIso }),
     db.prepare("UPDATE devices SET last_sync_at = ?1 WHERE id = ?2 AND revoked_at IS NULL AND EXISTS (SELECT 1 FROM api_tokens WHERE id = ?3 AND device_id = ?2 AND revoked_at IS NULL)").bind(nowIso, deviceId, tokenId),
     db.prepare("UPDATE api_tokens SET last_used_at = ?1 WHERE id = ?2 AND revoked_at IS NULL").bind(nowIso, tokenId),
   ]);
@@ -99,17 +123,23 @@ const all = async (statement) => (await statement.all()).results;
 
 export const minUsageDay = async (db) => (await db.prepare("SELECT MIN(day) AS day FROM usage_daily").first())?.day ?? null;
 
-export const leaderboardTotals = (db, { start, end, client, model }) =>
+export const leaderboardTotals = (db, { start, end, client, model, metricSql }) =>
   all(
     db
-      .prepare(`SELECT u.id, u.login, u.name, u.avatar_url, ${TOTAL_COLUMNS} ${USAGE_JOIN} WHERE ${FILTERED} GROUP BY u.id`)
+      .prepare(
+        `SELECT u.id, u.login, u.name, u.avatar_url, ${TOTAL_COLUMNS}, TOTAL(${metricSql}) AS value ${USAGE_JOIN} WHERE ${FILTERED}
+         GROUP BY u.id HAVING COUNT(${metricSql}) > 0`,
+      )
       .bind(start, end, client, model),
   );
 
 export const leaderboardByClient = (db, { start, end, client, model, metricSql }) =>
   all(
     db
-      .prepare(`SELECT d.user_id, ud.client, TOTAL(${metricSql}) AS value ${USAGE_JOIN} WHERE ${FILTERED} GROUP BY d.user_id, ud.client ORDER BY ud.client`)
+      .prepare(
+        `SELECT d.user_id, ud.client, TOTAL(${metricSql}) AS value ${USAGE_JOIN} WHERE ${FILTERED}
+         GROUP BY d.user_id, ud.client HAVING COUNT(${metricSql}) > 0 ORDER BY ud.client`,
+      )
       .bind(start, end, client, model),
   );
 
@@ -119,6 +149,34 @@ export const leaderboardDaily = (db, { start, end, client, model, metricSql }) =
       .prepare(`SELECT d.user_id, ud.day, TOTAL(${metricSql}) AS value ${USAGE_JOIN} WHERE ${FILTERED} GROUP BY d.user_id, ud.day`)
       .bind(start, end, client, model),
   );
+
+const ACTIVITY_JOIN = "FROM client_activity_daily ca JOIN devices d ON d.id = ca.device_id JOIN users u ON u.id = d.user_id";
+
+const ACTIVITY_FILTERED = "u.blocked_at IS NULL AND ca.day BETWEEN ?1 AND ?2 AND (?3 IS NULL OR ca.client = ?3)";
+
+export const activityLeaderboardTotals = (db, { start, end, client, metricSql }) =>
+  all(
+    db
+      .prepare(
+        `SELECT u.id, u.login, u.name, u.avatar_url, a.value, ${TOTAL_COLUMNS}
+         FROM (SELECT d.user_id, TOTAL(${metricSql}) AS value ${ACTIVITY_JOIN} WHERE ${ACTIVITY_FILTERED} GROUP BY d.user_id) a
+         JOIN users u ON u.id = a.user_id
+         LEFT JOIN devices d ON d.user_id = u.id
+         LEFT JOIN usage_daily ud ON ud.device_id = d.id AND ud.day BETWEEN ?1 AND ?2 AND (?3 IS NULL OR ud.client = ?3)
+         GROUP BY u.id`,
+      )
+      .bind(start, end, client),
+  );
+
+export const activityLeaderboardByClient = (db, { start, end, client, metricSql }) =>
+  all(
+    db
+      .prepare(`SELECT d.user_id, ca.client, TOTAL(${metricSql}) AS value ${ACTIVITY_JOIN} WHERE ${ACTIVITY_FILTERED} GROUP BY d.user_id, ca.client ORDER BY ca.client`)
+      .bind(start, end, client),
+  );
+
+export const activityLeaderboardDaily = (db, { start, end, client, metricSql }) =>
+  all(db.prepare(`SELECT d.user_id, ca.day, TOTAL(${metricSql}) AS value ${ACTIVITY_JOIN} WHERE ${ACTIVITY_FILTERED} GROUP BY d.user_id, ca.day`).bind(start, end, client));
 
 export const MAX_FILTER_VALUES = 500;
 
@@ -152,6 +210,37 @@ export const userTotals = (db, userId) =>
 
 export const userDaily = (db, { userId, start, end }) =>
   all(db.prepare(`SELECT ud.day, ${TOTAL_COLUMNS} ${USAGE_JOIN} WHERE u.id = ?1 AND ud.day BETWEEN ?2 AND ?3 GROUP BY ud.day`).bind(userId, start, end));
+
+export const userUsage = (db, { userId, start, end }) =>
+  all(
+    db
+      .prepare(
+        `SELECT ud.day, ud.client, ud.model, ${TOTAL_COLUMNS}, TOTAL(ud.messages) AS messages,
+           CASE WHEN COUNT(ud.gen_ms) > 0 THEN TOTAL(ud.gen_ms) END AS gen_ms
+         ${USAGE_JOIN} WHERE u.id = ?1 AND ud.day BETWEEN ?2 AND ?3 GROUP BY ud.day, ud.client, ud.model ORDER BY ud.day, ud.client, ud.model`,
+      )
+      .bind(userId, start, end),
+  );
+
+export const userActivityDays = (db, { userId, start, end }) =>
+  all(
+    db
+      .prepare(
+        `SELECT a.day, TOTAL(a.active_ms) AS active_ms, MAX(a.longest_ms) AS longest_ms, TOTAL(a.sessions) AS sessions, MAX(a.max_concurrent) AS max_concurrent
+         FROM activity_daily a JOIN devices d ON d.id = a.device_id WHERE d.user_id = ?1 AND a.day BETWEEN ?2 AND ?3 GROUP BY a.day ORDER BY a.day`,
+      )
+      .bind(userId, start, end),
+  );
+
+export const userClientActivity = (db, { userId, start, end }) =>
+  all(
+    db
+      .prepare(
+        `SELECT ca.day, ca.client, ca.prompts, ca.hours FROM client_activity_daily ca JOIN devices d ON d.id = ca.device_id
+         WHERE d.user_id = ?1 AND ca.day BETWEEN ?2 AND ?3 ORDER BY ca.day, ca.client`,
+      )
+      .bind(userId, start, end),
+  );
 
 export const userByClientModel = (db, userId) =>
   all(

@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import * as coreModule from "../core/index.js";
 import { DEFAULT_API_URL } from "../core/config.js";
-import { cleanText, formatNumber, formatRowsTable, formatStatus, formatSummary } from "./format.js";
+import { cleanText, formatActivityTables, formatNumber, formatRowsTable, formatStatus, formatSummary } from "./format.js";
 
 const EXIT_OK = 0;
 const EXIT_ERROR = 1;
@@ -87,6 +87,7 @@ const describeSince = (since) => (since ? `since ${since}` : "full history");
 const progressPrinter = (io) => (event) => {
   if (event.phase === "cursor") print(io.stderr, "Checking Cursor...");
   if (event.phase === "graph") print(io.stderr, `Reading usage with tokscale (${describeSince(event.since)})...`);
+  if (event.phase === "activity") print(io.stderr, `Measuring agent activity since ${event.since}...`);
   if (event.phase === "upload") print(io.stderr, `Uploading batch ${event.done + 1}/${event.total}...`);
 };
 
@@ -148,6 +149,7 @@ const runSync = async (io, { dryRun, apiUrl }) => {
   result.warnings?.forEach((warning) => print(io.stderr, `warning: ${cleanText(warning)}`));
   if (dryRun) {
     print(io.stdout, formatRowsTable(result.rows));
+    if (result.activity) print(io.stdout, `\n${formatActivityTables(result.activity)}`);
     print(io.stdout, `${plural(result.rows.length, "row")} (${describeSince(result.since)}). Dry run, nothing uploaded.`);
     return EXIT_OK;
   }

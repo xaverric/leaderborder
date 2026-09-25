@@ -77,7 +77,13 @@ What is sent, per day, tool and model:
 
 - token counts: input, output, cache read, cache write, reasoning
 - estimated API-equivalent cost in USD and the number of messages
+- model time: the summed duration of model responses and how many responses it covers. Cursor records no timing, so its rows have none.
 - a random device id, the device name and the tokscale version
+
+Per day, for the last 35 days on each sync:
+
+- session totals: active time, the longest stretch without a 3 minute break, the number of sessions and the peak of parallel sessions
+- per tool: the number of prompts and 24 hourly buckets of tokens, messages and prompts in the device's local time
 
 The device name defaults to a generic `Mac (arm64)` or `Mac (x64)` unless you sign in with `leaderborder login --device-name <name>`. Only you see your device names; other signed-in players see just how many devices you have.
 
@@ -89,7 +95,7 @@ What is never sent:
 
 - prompts, responses, code or any file content
 - file paths, project or repository names
-- session ids, MCP server names, timing data
+- session ids, MCP server names, timestamps of individual messages or prompts
 
 Credentials:
 

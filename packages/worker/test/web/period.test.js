@@ -4,7 +4,7 @@ import { METRICS, PERIODS, metricKey, metricLabel, periodLabel } from "../../pub
 describe("period helpers", () => {
   it("lists periods and metrics in display order", () => {
     expect(PERIODS).toEqual(["day", "week", "month", "all"]);
-    expect(METRICS).toEqual(["tokens", "tokens_nocache", "cost"]);
+    expect(METRICS).toEqual(["tokens", "tokens_nocache", "cost", "model_time", "prompts"]);
   });
 
   it.each([
@@ -20,11 +20,15 @@ describe("period helpers", () => {
     expect(metricLabel("tokens")).toBe("Tokens");
     expect(metricLabel("tokens_nocache")).toBe("Tokens without cache");
     expect(metricLabel("cost")).toBe("Cost");
+    expect(metricLabel("model_time")).toBe("Model time");
+    expect(metricLabel("prompts")).toBe("Prompts");
   });
 
   it("maps metrics to response keys", () => {
     expect(metricKey("tokens")).toBe("tokens");
     expect(metricKey("tokens_nocache")).toBe("tokensNoCache");
     expect(metricKey("cost")).toBe("costUsd");
+    expect(metricKey("model_time")).toBe("genMs");
+    expect(metricKey("prompts")).toBe("prompts");
   });
 });

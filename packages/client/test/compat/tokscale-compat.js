@@ -1,5 +1,5 @@
 import { fileURLToPath } from "node:url";
-import { readGraph, runTokscale, toUsageRows, validateRow } from "../../src/core/index.js";
+import { collectActivity, readGraph, readReport, runTokscale, toUsageRows, validateRow } from "../../src/core/index.js";
 
 const HOME = fileURLToPath(new URL("../../../../fixtures/home", import.meta.url));
 const TOKEN_FIELDS = ["input", "output", "cacheRead", "cacheWrite", "messages"];
@@ -9,6 +9,12 @@ const EXPECTED = [
   { day: "2026-09-11", client: "claude", model: "claude-haiku-4-5", input: 5, output: 7, cacheRead: 0, cacheWrite: 3, messages: 1 },
 ];
 const NOW = new Date(2026, 8, 24, 12);
+const ACTIVITY_WINDOW = { since: "2026-09-10", until: "2026-09-11" };
+const EXPECTED_GEN_MS = { "2026-09-10 claude claude-sonnet-4-5": 5000, "2026-09-10 codex gpt-5-codex": 2000, "2026-09-11 claude claude-haiku-4-5": 0 };
+const EXPECTED_ACTIVITY = {
+  "2026-09-10": { activeMs: 67000, longestMs: 65000, sessions: 2, maxConcurrent: 2, messages: { claude: 2, codex: 2 }, prompts: { claude: 1, codex: 0 } },
+  "2026-09-11": { activeMs: 0, longestMs: 0, sessions: 1, maxConcurrent: 1, messages: { claude: 1 }, prompts: { claude: 0 } },
+};
 
 const shapeProblems = (graph) => {
   const contributions = Array.isArray(graph.contributions) ? graph.contributions : null;
@@ -38,13 +44,33 @@ const rowProblems = (rows) => {
   return [...missing, ...unexpected, ...mismatched, ...invalid];
 };
 
+const differs = (label, expected, actual) => (JSON.stringify(expected) === JSON.stringify(actual) ? [] : [`${label}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`]);
+
+const sumBy = (clients, index) => Object.fromEntries(clients.map((c) => [c.client, c.hours.reduce((sum, bucket) => sum + bucket[index], 0)]));
+
+const activityProblems = ({ rows, activity }) => [
+  ...Object.entries(EXPECTED_GEN_MS).flatMap(([label, genMs]) => differs(`${label} genMs`, genMs, rows.find((row) => key(row) === label)?.genMs)),
+  ...differs("activity days", Object.keys(EXPECTED_ACTIVITY), activity.map((entry) => entry.day)),
+  ...activity.flatMap(({ day, clients, ...session }) => {
+    const { messages, prompts, ...expected } = EXPECTED_ACTIVITY[day] ?? {};
+    return [
+      ...differs(`${day} session metrics`, expected, session),
+      ...differs(`${day} hourly messages`, messages, sumBy(clients, 1)),
+      ...differs(`${day} prompts`, prompts, Object.fromEntries(clients.map((c) => [c.client, c.prompts]))),
+      ...clients.filter((c) => c.hours.length !== 24).map((c) => `${day} ${c.client}: expected 24 hours, got ${c.hours.length}`),
+    ];
+  }),
+];
+
 const { stdout: versionOutput } = await runTokscale(["--version"]);
 const version = versionOutput.trim();
 const graph = await readGraph({ home: HOME });
-const problems = [...shapeProblems(graph), ...rowProblems(toUsageRows(graph, NOW))];
+const rows = toUsageRows(graph, NOW);
+const activity = await collectActivity({ rows, window: ACTIVITY_WINDOW, home: HOME }, { report: readReport });
+const problems = [...shapeProblems(graph), ...rowProblems(rows), ...activityProblems(activity)];
 
 if (problems.length > 0) {
   process.stderr.write(`tokscale compat FAILED (${version}):\n${problems.map((p) => `  - ${p}`).join("\n")}\n`);
   process.exit(1);
 }
-process.stdout.write(`tokscale compat ok (${version}): ${EXPECTED.length} rows match\n`);
+process.stdout.write(`tokscale compat ok (${version}): ${EXPECTED.length} rows and ${Object.keys(EXPECTED_ACTIVITY).length} activity days match\n`);

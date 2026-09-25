@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { compactParts, formatCompact, formatDay, formatInteger, formatMetric, formatRange, formatUsd, relativeTime } from "../../public/js/lib/format.js";
+import {
+  compactParts,
+  formatCompact,
+  formatDay,
+  formatDecimal,
+  formatDuration,
+  formatInteger,
+  formatMetric,
+  formatRange,
+  formatUsd,
+  relativeTime,
+} from "../../public/js/lib/format.js";
 
 describe("formatCompact", () => {
   it.each([
@@ -42,6 +53,40 @@ describe("formatMetric", () => {
     expect(formatMetric("cost", 42)).toBe("$42.00");
     expect(formatMetric("tokens", 42_000)).toBe("42K");
     expect(formatMetric("tokens_nocache", 1_000_000)).toBe("1M");
+    expect(formatMetric("prompts", 1234)).toBe("1.2K");
+  });
+
+  it("uses durations for model time", () => {
+    expect(formatMetric("model_time", 5_400_000)).toBe("1h 30m");
+  });
+});
+
+describe("formatDuration", () => {
+  it.each([
+    [0, "0s"],
+    [42_400, "42s"],
+    [59_600, "1m"],
+    [754_000, "13m"],
+    [3_600_000, "1h"],
+    [12_000_000, "3h 20m"],
+    [187_800_000, "52h 10m"],
+    [370_000_000, "102h"],
+  ])("%s ms -> %s", (ms, expected) => {
+    expect(formatDuration(ms)).toBe(expected);
+  });
+
+  it("returns a dash when time was not measured", () => {
+    expect(formatDuration(null)).toBe("-");
+    expect(formatDuration(undefined)).toBe("-");
+    expect(formatDuration(-1)).toBe("-");
+  });
+});
+
+describe("formatDecimal", () => {
+  it("keeps one decimal", () => {
+    expect(formatDecimal(4.25)).toBe("4.3");
+    expect(formatDecimal(6)).toBe("6");
+    expect(formatDecimal(null)).toBe("-");
   });
 });
 

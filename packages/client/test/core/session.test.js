@@ -25,10 +25,17 @@ const graphFor = (days) => ({
   })),
 });
 
+const REPORTS = {
+  models: { entries: [{ client: "claude", model: "claude-opus-5", performance: { totalDurationMs: 4000, sampleCount: 2 } }] },
+  "time-metrics": { metrics: { total_active_time_ms: 9000, longest_continuous_ms: 8000, session_count: 1, max_concurrent_sessions: 1 } },
+  hourly: { entries: [{ hour: "2026-09-24 10:00", input: 10, output: 20, cacheRead: 30, cacheWrite: 40, messageCount: 2, turnCount: 1 }] },
+};
+
 const harness = ({
   state = {},
   token = TOKEN,
   graph = graphFor(["2026-09-24"]),
+  report = async (command) => REPORTS[command],
   putUsage,
   cursor = { loggedIn: false },
   cursorSync,
@@ -43,6 +50,7 @@ const harness = ({
     uploads: [],
     sleeps: [],
     graphCalls: [],
+    reportCalls: [],
     cursorSyncs: 0,
     apiOptions: [],
     registrations: [],
@@ -109,6 +117,10 @@ const harness = ({
       h.graphCalls.push(options);
       return graph;
     },
+    readReport: async (command, options) => {
+      h.reportCalls.push([command, options]);
+      return report(command, options);
+    },
     sleep: async (ms) => {
       h.sleeps.push(ms);
     },
@@ -124,7 +136,7 @@ test("sync uploads rows, saves state and returns the summary", async () => {
   const h = harness({ state: { lastSyncAt: "2026-09-23T10:00:00.000Z" } });
   const result = await sync({ now, deps: h.deps });
   assert.equal(h.uploads.length, 1);
-  assert.deepEqual(Object.keys(h.uploads[0]), ["deviceId", "tokscaleVersion", "rows"]);
+  assert.deepEqual(Object.keys(h.uploads[0]), ["deviceId", "tokscaleVersion", "rows", "activity"]);
   assert.equal(h.uploads[0].deviceId, DEVICE_ID);
   assert.equal(h.uploads[0].tokscaleVersion, "4.17.0");
   assert.equal(h.apiOptions[0].token, TOKEN);
@@ -233,7 +245,67 @@ test("sync reports progress phases", async () => {
   const phases = [];
   const h = harness();
   await sync({ now, deps: h.deps, onProgress: (event) => phases.push(event.phase) });
-  assert.deepEqual(phases, ["cursor", "graph", "upload", "done"]);
+  assert.deepEqual(phases, ["cursor", "graph", "activity", "upload", "done"]);
+});
+
+test("sync measures activity, adds model time to rows and sends activity with the first batch", async () => {
+  const h = harness({ state: { lastSyncAt: "2026-09-23T10:00:00.000Z" } });
+  const result = await sync({ now, deps: h.deps });
+  assert.deepEqual(h.reportCalls.map(([command]) => command), ["models", "time-metrics", "hourly"]);
+  assert.equal(h.reportCalls[0][1].since, "2026-09-24");
+  assert.deepEqual(h.uploads[0].rows[0], { ...result.rows[0], genMs: 4000, genSamples: 2 });
+  assert.deepEqual(h.uploads[0].activity, [
+    {
+      day: "2026-09-24",
+      activeMs: 9000,
+      longestMs: 8000,
+      sessions: 1,
+      maxConcurrent: 1,
+      clients: [{ client: "claude", prompts: 1, hours: Array.from({ length: 24 }, (_, hour) => (hour === 10 ? [100, 2, 1] : [0, 0, 0])) }],
+    },
+  ]);
+  assert.equal(h.state.lastActivityAt, now.toISOString());
+});
+
+test("sync sends activity only with the first of several batches", async () => {
+  const days = Array.from({ length: 501 }, (_, i) => new Date(Date.UTC(2026, 8, 24 - i)).toISOString().slice(0, 10));
+  const h = harness({ graph: graphFor(days) });
+  await sync({ now, deps: h.deps });
+  assert.equal(h.uploads.length, 2);
+  assert.equal(h.uploads[0].activity.length, 35);
+  assert.equal("activity" in h.uploads[1], false);
+});
+
+test("sync resumes activity one day before the last measurement", async () => {
+  const events = [];
+  const h = harness({ graph: graphFor(["2026-09-22", "2026-09-23", "2026-09-24"]), state: { lastSyncAt: "2026-09-24T08:00:00.000Z", lastActivityAt: new Date(2026, 8, 24, 8).toISOString() } });
+  await sync({ now, deps: h.deps, onProgress: (event) => events.push(event) });
+  assert.equal(events.find((event) => event.phase === "activity").since, "2026-09-23");
+  assert.deepEqual(h.uploads[0].activity.map((entry) => entry.day), ["2026-09-23", "2026-09-24"]);
+  assert.equal(h.uploads[0].rows.find((row) => row.day === "2026-09-22").genMs, undefined);
+});
+
+test("sync keeps uploading usage when activity measurement fails", async () => {
+  const previous = "2026-09-20T10:00:00.000Z";
+  const h = harness({
+    state: { lastActivityAt: previous },
+    report: async () => {
+      throw new LeaderborderError("tokscale_failed", "report broke");
+    },
+  });
+  const result = await sync({ now, deps: h.deps });
+  assert.equal(h.uploads.length, 1);
+  assert.equal("activity" in h.uploads[0], false);
+  assert.equal(h.uploads[0].rows[0].genMs, undefined);
+  assert.match(result.warnings[0], /Activity metrics skipped: report broke/);
+  assert.equal(h.state.lastActivityAt, previous);
+});
+
+test("dry run returns the measured activity", async () => {
+  const h = harness({ token: null, state: { deviceId: null } });
+  const result = await sync({ now, dryRun: true, deps: h.deps });
+  assert.equal(result.activity.length, 1);
+  assert.equal(result.rows[0].genMs, 4000);
 });
 
 test("sync records tokscale failures in lastError", async () => {
@@ -362,13 +434,14 @@ test("login does not store a token when registration is forbidden", async () => 
 });
 
 test("logout revokes the token on the server, then deletes it and clears the device", async () => {
-  const h = harness({ state: { lastSyncAt: "2026-09-23T10:00:00.000Z", summary: { topModel: "x" } } });
+  const h = harness({ state: { lastSyncAt: "2026-09-23T10:00:00.000Z", lastActivityAt: "2026-09-23T10:00:00.000Z", summary: { topModel: "x" } } });
   assert.deepEqual(await logout({ deps: h.deps }), { revoked: true });
   assert.deepEqual(h.events, [`revokeSelf:${TOKEN}`, "deleteToken"]);
   assert.equal(h.apiOptions[0].apiUrl, "http://api.test");
   assert.equal(h.token, null);
   assert.equal(h.state.deviceId, null);
   assert.equal(h.state.lastSyncAt, null);
+  assert.equal(h.state.lastActivityAt, null);
   assert.equal(h.state.summary, null);
 });
 

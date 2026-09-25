@@ -1,6 +1,6 @@
 import { api } from "../api.js";
 import { formatMetric, formatRange } from "../lib/format.js";
-import { METRICS, PERIODS, metricLabel, periodLabel, periodShort } from "../lib/period.js";
+import { METRICS, PERIODS, TOOL_ONLY_METRICS, metricLabel, periodLabel, periodShort } from "../lib/period.js";
 import { filtersFromSearch, leaderboardQuery } from "../lib/query.js";
 import { clientLabel, clientSlot } from "../lib/share.js";
 import { renderLegend, renderShareBar, renderSparkline } from "../ui/charts.js";
@@ -9,7 +9,9 @@ import { githubLink } from "../ui/github.js";
 
 const DESKTOP = "(min-width: 48rem)";
 
-const select = ({ name, label, value, options, onchange }) =>
+const TIMED_METRICS = ["model_time", "prompts"];
+
+const select = ({ name, label, value, options, onchange, disabled = false, hint = null }) =>
   h(
     "label",
     { class: "field" },
@@ -19,10 +21,11 @@ const select = ({ name, label, value, options, onchange }) =>
       { class: "select" },
       h(
         "select",
-        { name, onchange: (event) => onchange(event.target.value) },
+        { name, disabled, onchange: (event) => onchange(event.target.value) },
         options.map(([optionValue, text]) => h("option", { value: optionValue, selected: optionValue === value }, text)),
       ),
     ),
+    hint ? h("span", { class: "field__hint" }, hint) : null,
   );
 
 const periodControl = (value, onchange) =>
@@ -105,7 +108,15 @@ const emptyState = (filters, onReset) =>
     "div",
     { class: "empty card" },
     h("p", { class: "empty__title" }, "No usage in this view."),
-    h("p", { class: "muted" }, filters.client || filters.model ? "Nobody used that tool or model in this period." : "Nobody has synced usage for this period yet."),
+    h(
+      "p",
+      { class: "muted" },
+      TIMED_METRICS.includes(filters.metric)
+        ? "Nobody has synced timing data for this view yet. It needs an updated leaderborder client, and Cursor records no timing."
+        : filters.client || filters.model
+          ? "Nobody used that tool or model in this period."
+          : "Nobody has synced usage for this period yet.",
+    ),
     h("button", { class: "btn btn--sm", type: "button", onclick: onReset }, "Show all time, all tools"),
   );
 
@@ -159,8 +170,10 @@ export const renderLeaderboard = (view, ctx) => {
       select({
         name: "model",
         label: "Model",
-        value: filters.model,
+        value: TOOL_ONLY_METRICS.includes(filters.metric) ? "" : filters.model,
         options: [["", "All models"], ...[...new Set([...options.models, filters.model].filter(Boolean))].map((m) => [m, m])],
+        disabled: TOOL_ONLY_METRICS.includes(filters.metric),
+        hint: TOOL_ONLY_METRICS.includes(filters.metric) ? "Prompts are counted per tool, not per model." : null,
         onchange: (v) => update("model", v),
       }),
     );

@@ -1,5 +1,5 @@
 import { buildHeatmap } from "../lib/heatmap.js";
-import { formatDay, formatDayShort, formatMetric } from "../lib/format.js";
+import { formatCompact, formatDay, formatDayShort, formatInteger, formatMetric } from "../lib/format.js";
 import { clientLabel, shareSegments } from "../lib/share.js";
 import { sparklinePath } from "../lib/sparkline.js";
 import { h, svg } from "./dom.js";
@@ -15,7 +15,7 @@ const WEEKDAYS = [
 export const heatmapCellFor = (width, weeks, { min = 10, max = 30 } = {}) =>
   Math.max(min, Math.min(max, Math.floor(((width - LEFT) / weeks) * 0.8)));
 
-export const renderHeatmap = ({ daily, end, days, key = "tokens", metric = "tokens", label, cell = 12, scroll = true }) => {
+export const renderHeatmap = ({ daily, end, days, key = "tokens", metric = "tokens", label, cell = 12, scroll = true, selected = new Set(), onSelect = null }) => {
   const CELL = cell;
   const GAP = Math.max(2, Math.round(cell * 0.24));
   const STEP = CELL + GAP;
@@ -36,7 +36,7 @@ export const renderHeatmap = ({ daily, end, days, key = "tokens", metric = "toke
         width: CELL,
         height: CELL,
         rx: Math.min(4, Math.max(2, Math.round(CELL * 0.16))),
-        class: `heat heat--${cell.level}`,
+        class: `heat heat--${cell.level}${selected.has(cell.day) ? " is-selected" : ""}`,
         "data-index": cells.length,
       });
       cells.push({ ...cell, rect });
@@ -56,18 +56,27 @@ export const renderHeatmap = ({ daily, end, days, key = "tokens", metric = "toke
   const graphic = svg(
     "svg",
     {
-      class: "heatmap__svg",
+      class: `heatmap__svg${onSelect ? " heatmap__svg--select" : ""}`,
       viewBox: `0 0 ${width} ${height}`,
       width,
       height,
       role: "img",
       tabindex: 0,
-      "aria-label": `${label}: ${formatMetric(metric, map.total)} over ${map.activeDays} active days`,
+      "aria-label": `${label}: ${formatMetric(metric, map.total)} over ${map.activeDays} active days${onSelect ? ". Press Enter to open the focused day" : ""}`,
       onpointerover: (event) => {
         const index = event.target.dataset?.index;
         if (index !== undefined) activate(Number(index));
       },
+      onclick: (event) => {
+        const index = event.target.dataset?.index;
+        if (onSelect && index !== undefined) onSelect(cells[Number(index)].day);
+      },
       onkeydown: (event) => {
+        if (event.key === "Enter" && onSelect && active >= 0) {
+          event.preventDefault();
+          onSelect(cells[active].day);
+          return;
+        }
         const moves = { ArrowLeft: -7, ArrowRight: 7, ArrowUp: -1, ArrowDown: 1, Home: -Infinity, End: Infinity };
         if (!(event.key in moves)) return;
         event.preventDefault();
@@ -133,9 +142,14 @@ export const renderLegend = (clients) =>
     clients.map((client) => h("li", {}, h("span", { class: `legend__swatch series--${client.slot}`, "aria-hidden": "true" }), clientLabel(client.client))),
   );
 
-export const renderBreakdown = (groups, { metric }) => {
+const pick = (label, { selected, onSelect, className, focus }) =>
+  onSelect
+    ? h("button", { class: `${className} breakdown__pick`, type: "button", "aria-pressed": String(selected), "data-focus": focus, onclick: onSelect }, label)
+    : h("span", { class: className }, label);
+
+export const renderBreakdown = (groups, { metric, empty = "No usage recorded yet.", filters = {}, onClient = null, onModel = null }) => {
   const total = groups.reduce((sum, g) => sum + g.total, 0);
-  if (!total) return h("p", { class: "muted" }, "No usage recorded yet.");
+  if (!total) return h("p", { class: "muted" }, empty);
   const rows = groups.map((group) =>
     h(
       "li",
@@ -144,7 +158,12 @@ export const renderBreakdown = (groups, { metric }) => {
         "div",
         { class: "breakdown__head" },
         h("span", { class: `legend__swatch series--${group.slot}`, "aria-hidden": "true" }),
-        h("span", { class: "breakdown__client" }, clientLabel(group.client)),
+        pick(clientLabel(group.client), {
+          className: "breakdown__client",
+          selected: filters.client === group.client,
+          focus: `pick:${group.client}`,
+          onSelect: onClient && (() => onClient(group.client)),
+        }),
         h("span", { class: "breakdown__value tnum" }, formatMetric(metric, group.total)),
         h("span", { class: "breakdown__pct tnum" }, `${Math.round((group.total / total) * 100)}%`),
       ),
@@ -162,15 +181,22 @@ export const renderBreakdown = (groups, { metric }) => {
       h(
         "ul",
         { class: "breakdown__models" },
-        group.models.map((model, i) =>
-          h(
-            "li",
-            {},
-            h("span", { class: `breakdown__key series--${group.slot} shade--${Math.min(i, 3)}`, "aria-hidden": "true" }),
-            h("span", { class: "breakdown__model" }, model.model),
-            h("span", { class: "tnum muted" }, formatMetric(metric, model.value)),
+        group.models
+          .filter((model) => model.model)
+          .map((model, i) =>
+            h(
+              "li",
+              {},
+              h("span", { class: `breakdown__key series--${group.slot} shade--${Math.min(i, 3)}`, "aria-hidden": "true" }),
+              pick(model.model, {
+                className: "breakdown__model",
+                selected: filters.model === model.model,
+                focus: `pick:${group.client}:${model.model}`,
+                onSelect: onModel && (() => onModel(model.model)),
+              }),
+              h("span", { class: "tnum muted" }, formatMetric(metric, model.value)),
+            ),
           ),
-        ),
       ),
     ),
   );
@@ -178,3 +204,73 @@ export const renderBreakdown = (groups, { metric }) => {
 };
 
 export const dayTick = (day) => formatDayShort(day);
+
+const HOUR_STEP = 14;
+const HOUR_BAR = 10;
+const HOUR_PLOT = 96;
+const HOUR_TICKS = [0, 6, 12, 18];
+
+const clock = (hour) => `${String(hour).padStart(2, "0")}:00`;
+
+const plural = (n, word) => `${formatInteger(n)} ${word}${n === 1 ? "" : "s"}`;
+
+export const renderHours = (hours, { label }) => {
+  const max = hours.reduce((m, bucket) => Math.max(m, bucket[0]), 0);
+  const peak = hours.findIndex((bucket) => max > 0 && bucket[0] === max);
+  const readout = h("p", { class: "heatmap__readout", "aria-live": "polite" }, "Hover or tap an hour to read it.");
+  const describe = (hour) => {
+    const [tokens, messages, prompts] = hours[hour];
+    return `${clock(hour)} - ${clock(hour + 1)} · ${formatCompact(tokens)} tokens · ${plural(messages, "message")} · ${plural(prompts, "prompt")}`;
+  };
+  const bars = hours.map(([tokens], hour) =>
+    svg(
+      "g",
+      { "data-hour": hour },
+      svg("rect", { x: hour * HOUR_STEP, y: 0, width: HOUR_STEP, height: HOUR_PLOT, class: "hours__hit", "data-hour": hour }),
+      tokens > 0
+        ? svg("rect", {
+            x: hour * HOUR_STEP + (HOUR_STEP - HOUR_BAR) / 2,
+            y: HOUR_PLOT - Math.max(2, (tokens / max) * HOUR_PLOT),
+            width: HOUR_BAR,
+            height: Math.max(2, (tokens / max) * HOUR_PLOT),
+            rx: 2,
+            class: "hours__bar",
+            "data-hour": hour,
+          })
+        : null,
+    ),
+  );
+  let active = -1;
+  const activate = (hour) => {
+    if (hour < 0 || hour >= hours.length) return;
+    bars[active]?.classList.remove("is-active");
+    active = hour;
+    bars[active].classList.add("is-active");
+    readout.textContent = describe(hour);
+  };
+  const graphic = svg(
+    "svg",
+    {
+      class: "hours__svg",
+      viewBox: `0 0 ${hours.length * HOUR_STEP} ${HOUR_PLOT + 18}`,
+      role: "img",
+      tabindex: 0,
+      "aria-label": max > 0 ? `${label}: busiest hour ${clock(peak)}` : `${label}: no activity`,
+      onpointerover: (event) => {
+        const hour = event.target.dataset?.hour;
+        if (hour !== undefined) activate(Number(hour));
+      },
+      onkeydown: (event) => {
+        const moves = { ArrowLeft: -1, ArrowRight: 1, Home: -Infinity, End: Infinity };
+        if (!(event.key in moves)) return;
+        event.preventDefault();
+        const next = active < 0 ? peak : active + moves[event.key];
+        activate(Math.max(0, Math.min(hours.length - 1, Number.isFinite(next) ? next : moves[event.key] < 0 ? 0 : hours.length - 1)));
+      },
+      onfocus: () => active < 0 && activate(Math.max(0, peak)),
+    },
+    bars,
+    HOUR_TICKS.map((hour) => svg("text", { x: hour * HOUR_STEP + 2, y: HOUR_PLOT + 14, class: "heatmap__label" }, clock(hour))),
+  );
+  return h("figure", { class: "hours" }, graphic, h("figcaption", { class: "heatmap__foot" }, readout));
+};

@@ -24,7 +24,7 @@ const runCleanups = () => {
 const setSearch = (search) => {
   const url = new URL(location.href);
   const keep = new URLSearchParams(url.search);
-  for (const key of ["period", "metric", "client", "model"]) keep.delete(key);
+  for (const key of ["period", "metric", "client", "model", "day", "span"]) keep.delete(key);
   const next = new URLSearchParams(search);
   for (const [key, value] of next) keep.set(key, value);
   url.search = keep.toString();

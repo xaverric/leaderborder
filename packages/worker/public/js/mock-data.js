@@ -1,5 +1,5 @@
 import { addDays, dayRange, isoDay } from "./lib/dates.js";
-import { metricKey } from "./lib/period.js";
+import { TOOL_ONLY_METRICS, metricKey } from "./lib/period.js";
 import { filtersFromSearch } from "./lib/query.js";
 
 const MODELS = {
@@ -43,6 +43,10 @@ const PLAYERS = [
 ];
 
 const HISTORY_DAYS = 400;
+
+const UNTIMED_CLIENTS = new Set(["cursor"]);
+
+const WORK_HOURS = [9, 10, 11, 13, 14, 15, 16, 17, 20, 21];
 
 const mulberry32 = (seed) => () => {
   seed = (seed + 0x6d2b79f5) | 0;
@@ -88,12 +92,15 @@ const generateRows = (today) => {
           const output = Math.round(tokens * 0.035);
           const cacheWrite = Math.max(0, tokens - cacheRead - input - output);
           const row = { login: player.login, day, client, model, input, output, cacheRead, cacheWrite, reasoning: Math.round(output * 0.3) };
+          const messages = Math.max(1, Math.round(tokens / 180000));
           rows.push({
             ...row,
             tokens: input + output + cacheRead + cacheWrite,
             tokensNoCache: input + output,
             costUsd: Math.round(costOf(model, row) * 100) / 100,
-            messages: Math.max(1, Math.round(tokens / 180000)),
+            messages,
+            genMs: UNTIMED_CLIENTS.has(client) ? null : Math.round(messages * (4000 + random() * 9000)),
+            prompts: UNTIMED_CLIENTS.has(client) ? 0 : Math.max(1, Math.round(messages / (6 + random() * 14))),
           });
         }
       }
@@ -109,7 +116,7 @@ const periodRange = (period, today, firstDay) => {
   return { start: firstDay, end: today };
 };
 
-const sum = (rows, key) => rows.reduce((total, row) => total + row[key], 0);
+const sum = (rows, key) => rows.reduce((total, row) => total + (row[key] ?? 0), 0);
 
 const round2 = (n) => Math.round(n * 100) / 100;
 
@@ -137,6 +144,36 @@ const dailySeries = (rows, days, today, pick) => {
 
 const error = (status, code, message) => ({ status, body: { error: { code, message } } });
 
+const spreadHours = (rows, seed) => {
+  const random = mulberry32(seed);
+  const hours = Array.from({ length: 24 }, () => [0, 0, 0]);
+  for (const row of rows) {
+    const hour = WORK_HOURS[Math.floor(random() * WORK_HOURS.length)];
+    hours[hour] = [hours[hour][0] + row.tokens, hours[hour][1] + row.messages, hours[hour][2] + row.prompts];
+  }
+  return hours;
+};
+
+const activityOf = (userRows) => {
+  const timed = userRows.filter((row) => row.genMs !== null);
+  const byDay = groupBy(timed, (row) => row.day);
+  const days = [...byDay.entries()].map(([day, dayRows], index) => {
+    const modelMs = sum(dayRows, "genMs");
+    const clients = new Set(dayRows.map((row) => row.client)).size;
+    return { day, activeMs: Math.round(modelMs * (1.4 + (index % 5) * 0.15)), longestMs: Math.round(modelMs * 0.6), sessions: clients + (index % 3), maxConcurrent: clients };
+  });
+  const clients = [...groupBy(timed, (row) => `${row.day}\u0000${row.client}`).values()].map((pairRows, index) => ({
+    day: pairRows[0].day,
+    client: pairRows[0].client,
+    prompts: sum(pairRows, "prompts"),
+    hours: spreadHours(pairRows, index + 1),
+  }));
+  return { days, clients };
+};
+
+const usageOf = (userRows) =>
+  userRows.map(({ day, client, model, tokens, tokensNoCache, costUsd, messages, genMs }) => ({ day, client, model, tokens, tokensNoCache, costUsd, messages, genMs }));
+
 const userOf = (player) => ({ login: player.login, name: player.name, avatarUrl: avatarFor(player) });
 
 const initialDevices = (now) => [
@@ -159,14 +196,16 @@ export const createMockApi = ({ now = new Date() } = {}) => {
     const filters = filtersFromSearch(search);
     const range = periodRange(filters.period, today, firstDay);
     const key = metricKey(filters.metric);
-    const matches = (row) => (!filters.client || row.client === filters.client) && (!filters.model || row.model === filters.model);
+    const model = TOOL_ONLY_METRICS.includes(filters.metric) ? "" : filters.model;
+    const measured = (row) => key !== "genMs" || row.genMs !== null;
+    const matches = (row) => (!filters.client || row.client === filters.client) && (!model || row.model === model) && measured(row);
     const filtered = rows.filter(matches);
     const inRange = filtered.filter((row) => row.day >= range.start && row.day <= range.end);
     const sparkDays = dayRange(range.end, 30);
     const entries = [...groupBy(inRange, (row) => row.login).entries()]
       .map(([login, userRows]) => {
         const player = players.get(login);
-        const totals = totalsOf(userRows);
+        const totals = { ...totalsOf(userRows), genMs: sum(userRows, "genMs"), prompts: sum(userRows, "prompts") };
         const byClient = Object.fromEntries(
           [...groupBy(userRows, (row) => row.client).entries()].map(([client, clientRows]) => [client, round2(sum(clientRows, key))]),
         );
@@ -176,7 +215,7 @@ export const createMockApi = ({ now = new Date() } = {}) => {
           name: player.name,
           avatarUrl: avatarFor(player),
           value: totals[key],
-          ...totals,
+          ...totalsOf(userRows),
           byClient,
           sparkline: sparkDays.map((day) => ({ day, value: round2(sum(sparkRows.get(day) ?? [], key)) })),
         };
@@ -217,6 +256,7 @@ export const createMockApi = ({ now = new Date() } = {}) => {
     const player = players.get(login);
     if (!player) return error(404, "not_found", `No player called ${login}.`);
     const userRows = rows.filter((row) => row.login === login);
+    const recentRows = userRows.filter((row) => row.day > addDays(today, -365));
     const pairs = groupBy(userRows, (row) => `${row.client}\u0000${row.model}`);
     return {
       status: 200,
@@ -229,6 +269,8 @@ export const createMockApi = ({ now = new Date() } = {}) => {
         },
         daily: dailySeries(userRows, 365, today, totalsOf),
         byClientModel: [...pairs.values()].map((pairRows) => ({ client: pairRows[0].client, model: pairRows[0].model, ...totalsOf(pairRows) })),
+        usage: usageOf(recentRows),
+        activity: activityOf(recentRows),
         devices:
           login === MOCK_LOGIN
             ? devices.map(({ name, lastSyncAt }) => ({ name, lastSyncAt }))

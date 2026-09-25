@@ -2,7 +2,7 @@ import { isAdmin } from "../access.js";
 import { assertSameOrigin, requireAnyUser, requireBearer, requireCookieUser } from "../auth.js";
 import { cookieName, isLocalApp, serializeCookie } from "../cookies.js";
 import { HttpError, json, noContent } from "../http.js";
-import { toRankedTotals } from "../metrics.js";
+import { METRIC_SQL, toRankedTotals } from "../metrics.js";
 import { periodRange } from "../periods.js";
 import { deleteUser, leaderboardTotals, listDevices, revokeDevice, toUser } from "../queries.js";
 import { SESSION_COOKIE } from "../session.js";
@@ -11,7 +11,7 @@ import { leaderboardTz } from "./leaderboard.js";
 const toDevice = (row) => ({ id: row.id, name: row.name, createdAt: row.created_at, lastSyncAt: row.last_sync_at ?? null });
 
 const weeklyRank = async (db, userId, now, tz) => {
-  const ranked = toRankedTotals("tokens", await leaderboardTotals(db, { ...periodRange("week", now, tz), client: null, model: null }));
+  const ranked = toRankedTotals("tokens", await leaderboardTotals(db, { ...periodRange("week", now, tz), client: null, model: null, metricSql: METRIC_SQL.tokens }));
   const mine = ranked.find((entry) => entry.id === userId);
   return mine ? { period: "week", metric: "tokens", position: mine.rank, of: ranked.length, value: mine.value } : null;
 };
