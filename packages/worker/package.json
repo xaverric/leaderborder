@@ -12,9 +12,9 @@
     "db:seed:local": "wrangler d1 execute leaderborder --local --file test/fixtures/seed.sql"
   },
   "devDependencies": {
-    "wrangler": "^4.138.0",
+    "wrangler": "^4.151.0",
     "vitest": "4.1.11",
-    "@cloudflare/vitest-pool-workers": "^0.22.0",
+    "@cloudflare/vitest-pool-workers": "^0.23.0",
     "uplot": "^1.6.32",
     "@vitest/runner": "4.1.11",
     "@vitest/snapshot": "4.1.11"
