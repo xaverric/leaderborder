@@ -20,7 +20,12 @@
     "test:scripts": "node --test \"scripts/*.test.js\""
   },
   "overrides": {
-    "sharp": "0.35.4"
+    "sharp": "0.35.5",
+    "http-cache-semantics": "4.3.0",
+    "source-map-js": "1.2.2",
+    "miniflare": {
+      "undici": "7.30.0"
+    }
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
