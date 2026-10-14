@@ -31,8 +31,8 @@
     "test:e2e": "playwright test -c test/app/playwright.config.js"
   },
   "dependencies": {
-    "@tokscale/cli": "4.17.0",
-    "electron": "44.4.5"
+    "@tokscale/cli": "4.18.0",
+    "electron": "44.6.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
