@@ -1,7 +1,7 @@
 appId: cz.xaverric.leaderborder
 productName: Leaderborder
 copyright: Copyright (c) 2026 xaverric
-electronVersion: 44.4.5
+electronVersion: 44.11.3
 directories:
   output: dist
 files:

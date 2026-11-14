@@ -42,7 +42,7 @@ test("device login shows the code and lands on the account view", async () => {
     await page.getByRole("button", { name: "Sign in with GitHub" }).click();
     await expect(page.locator('[data-field="user-code"]')).toHaveText("FAKE-1234");
     await expect(page.locator('[data-screen="account"]')).toBeVisible({ timeout: 10_000 });
-    await expect(page.locator('[data-field="today-tokens"]')).toHaveText("1.3M", { timeout: 10_000 });
+    await expect(page.locator('[data-field="today-tokens"]')).toHaveText("12.5M", { timeout: 10_000 });
     await expect(page.locator('[data-field="rank-label"]')).toHaveText("#3");
     await expect(page.getByRole("button", { name: "Open leaderboard" })).toBeVisible();
   } finally {
@@ -54,8 +54,11 @@ test("signed-in fake core renders the account view", async () => {
   const { app, page } = await launch({ LEADERBORDER_FAKE_SIGNED_IN: "1" });
   try {
     await expect(page.locator('[data-screen="account"]')).toBeVisible();
-    await expect(page.locator('[data-field="week-tokens"]')).toHaveText("18.9M");
-    await expect(page.locator('[data-field="top-model"]')).toHaveText("claude-opus-5");
+    await expect(page.locator('[data-field="today-tokens"]')).toHaveText("12.5M");
+    await expect(page.locator('[data-field="week-tokens"]')).toHaveText("180M");
+    await expect(page.locator('[data-field="top-model"]')).toHaveText("gpt-6");
+    await expect(page.locator('[data-show="device"]')).toBeVisible();
+    await expect(page.locator('[data-field="device"]')).toHaveText("1.3M today, 18.9M this week");
     await page.getByRole("button", { name: "Connect Cursor" }).click();
     await expect(page.locator('[data-show="cursor-hint"] code')).toHaveText("npx leaderborder cursor-login");
   } finally {

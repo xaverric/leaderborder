@@ -5,6 +5,11 @@ const FAKE_SUMMARY = {
   week: { tokens: 18_902_550, costUsd: 51.2 },
   topModel: "claude-opus-5",
 };
+const FAKE_TOTALS = {
+  today: { tokens: 12_500_000, costUsd: 38.4 },
+  week: { tokens: 180_000_000, costUsd: 512 },
+  topModel: "gpt-6",
+};
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -32,7 +37,8 @@ export const createFakeCore = ({
     if (!token || bearer !== token) throw fakeError("unauthorized", "Unauthorized");
     return {
       user: FAKE_USER,
-      rank: { period: "week", metric: "tokens", position: 3, of: 12, value: FAKE_SUMMARY.week.tokens },
+      rank: { period: "week", metric: "tokens", position: 3, of: 12, value: FAKE_TOTALS.week.tokens },
+      totals: FAKE_TOTALS,
       devices: [],
     };
   };

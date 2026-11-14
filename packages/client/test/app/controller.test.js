@@ -89,7 +89,7 @@ test("login shows the device code, opens GitHub, then syncs", async () => {
   assert.ok(views.some((v) => v.kind === "syncing"));
   const view = controller.view();
   assert.equal(view.kind, "idle");
-  assert.equal(view.today.tokens, "1.3M");
+  assert.equal(view.today.tokens, "12.5M");
   assert.equal(view.rank.label, "#3");
   assert.equal(view.lastSync, "Just now");
 });
