@@ -31,6 +31,10 @@ else
   echo "::warning::@electron/fuses is not installed, skipping the fuse check" >&2
 fi
 
+if [ "$arch" = "$(node -p process.arch)" ]; then
+  node scripts/smoke-packaged-app.js "$app"
+fi
+
 dmgs=()
 while IFS= read -r -d '' file; do dmgs+=("$file"); done \
   < <(find packages/client -name '*.dmg' -newer "$marker" -not -path '*/node_modules/*' -print0)
