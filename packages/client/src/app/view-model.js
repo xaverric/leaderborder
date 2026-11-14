@@ -75,15 +75,20 @@ const toRank = (rank) =>
 
 const toTotals = (bucket) => ({ tokens: compactNumber(bucket?.tokens), cost: formatCost(bucket?.costUsd) });
 
+const toDeviceLine = (summary) => `${compactNumber(summary?.today?.tokens)} today, ${compactNumber(summary?.week?.tokens)} this week`;
+
 const accountView = (state, session, now) => {
   const summary = state?.summary ?? null;
+  const account = session.me?.totals ?? null;
+  const shown = account ?? summary;
   const failure = session.error ?? state?.lastError ?? null;
   return {
-    trayTitle: compactNumber(summary?.today?.tokens),
+    trayTitle: compactNumber(shown?.today?.tokens),
     user: session.me?.user ?? null,
-    today: toTotals(summary?.today),
-    week: toTotals(summary?.week),
-    topModel: summary?.topModel ?? null,
+    today: toTotals(shown?.today),
+    week: toTotals(shown?.week),
+    topModel: shown?.topModel ?? null,
+    device: account ? toDeviceLine(summary) : null,
     rank: toRank(session.me?.rank),
     lastSync: relativeTime(state?.lastSyncAt, now),
     cursor: {

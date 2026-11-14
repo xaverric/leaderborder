@@ -112,7 +112,7 @@ export const upsertDevUser = async (db, login, nowIso) =>
     .bind(login, nowIso)
     .first();
 
-const USAGE_JOIN = "FROM usage_daily ud JOIN devices d ON d.id = ud.device_id JOIN users u ON u.id = d.user_id";
+const USAGE_JOIN = "FROM usage_effective ud JOIN devices d ON d.id = ud.device_id JOIN users u ON u.id = d.user_id";
 
 const FILTERED = "u.blocked_at IS NULL AND ud.day BETWEEN ?1 AND ?2 AND (?3 IS NULL OR ud.client = ?3) AND (?4 IS NULL OR ud.model = ?4)";
 
@@ -162,7 +162,7 @@ export const activityLeaderboardTotals = (db, { start, end, client, metricSql })
          FROM (SELECT d.user_id, TOTAL(${metricSql}) AS value ${ACTIVITY_JOIN} WHERE ${ACTIVITY_FILTERED} GROUP BY d.user_id) a
          JOIN users u ON u.id = a.user_id
          LEFT JOIN devices d ON d.user_id = u.id
-         LEFT JOIN usage_daily ud ON ud.device_id = d.id AND ud.day BETWEEN ?1 AND ?2 AND (?3 IS NULL OR ud.client = ?3)
+         LEFT JOIN usage_effective ud ON ud.device_id = d.id AND ud.day BETWEEN ?1 AND ?2 AND (?3 IS NULL OR ud.client = ?3)
          GROUP BY u.id`,
       )
       .bind(start, end, client),
@@ -253,11 +253,11 @@ export const publicTotals = (db, { start, end }) =>
   db
     .prepare(
       `SELECT
-        (SELECT COALESCE(TOTAL(input + output + cache_read + cache_write), 0) FROM usage_daily) AS tokens_all_time,
-        (SELECT COALESCE(TOTAL(input + output + cache_read + cache_write), 0) FROM usage_daily WHERE day BETWEEN ?1 AND ?2) AS tokens_week,
-        (SELECT COALESCE(TOTAL(cost_usd), 0) FROM usage_daily WHERE day BETWEEN ?1 AND ?2) AS cost_week,
+        (SELECT COALESCE(TOTAL(input + output + cache_read + cache_write), 0) FROM usage_effective) AS tokens_all_time,
+        (SELECT COALESCE(TOTAL(input + output + cache_read + cache_write), 0) FROM usage_effective WHERE day BETWEEN ?1 AND ?2) AS tokens_week,
+        (SELECT COALESCE(TOTAL(cost_usd), 0) FROM usage_effective WHERE day BETWEEN ?1 AND ?2) AS cost_week,
         (SELECT COUNT(*) FROM users) AS players,
-        (SELECT COUNT(DISTINCT d.user_id) FROM usage_daily ud JOIN devices d ON d.id = ud.device_id WHERE ud.day BETWEEN ?1 AND ?2) AS active_week`,
+        (SELECT COUNT(DISTINCT d.user_id) FROM usage_effective ud JOIN devices d ON d.id = ud.device_id WHERE ud.day BETWEEN ?1 AND ?2) AS active_week`,
     )
     .bind(start, end)
     .first();
@@ -267,7 +267,7 @@ export const topBy = (db, column, { start, end, limit = 5, minUsers = 1 }) =>
     db
       .prepare(
         `SELECT ud.${column} AS value, TOTAL(ud.input + ud.output + ud.cache_read + ud.cache_write) AS tokens
-         FROM usage_daily ud JOIN devices d ON d.id = ud.device_id
+         FROM usage_effective ud JOIN devices d ON d.id = ud.device_id
          WHERE ud.day BETWEEN ?1 AND ?2 GROUP BY ud.${column} HAVING COUNT(DISTINCT d.user_id) >= ?4
          ORDER BY tokens DESC, value LIMIT ?3`,
       )
@@ -277,6 +277,6 @@ export const topBy = (db, column, { start, end, limit = 5, minUsers = 1 }) =>
 export const dailyTokens = (db, { start, end }) =>
   all(
     db
-      .prepare("SELECT day, TOTAL(input + output + cache_read + cache_write) AS tokens FROM usage_daily WHERE day BETWEEN ?1 AND ?2 GROUP BY day")
+      .prepare("SELECT day, TOTAL(input + output + cache_read + cache_write) AS tokens FROM usage_effective WHERE day BETWEEN ?1 AND ?2 GROUP BY day")
       .bind(start, end),
   );

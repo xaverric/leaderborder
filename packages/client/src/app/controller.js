@@ -85,7 +85,7 @@ export const createController = ({ core, openExternal, writeClipboard, loginItem
       const token = await core.keychain.getToken(config);
       if (!token) return;
       const me = await core.createApi({ apiUrl: config.apiUrl, fetch: globalThis.fetch, token }).getMe();
-      update({ me: { user: me.user, rank: me.rank ?? null } });
+      update({ me: { user: me.user, rank: me.rank ?? null, totals: me.totals ?? null } });
     } catch (error) {
       if (error?.code === "unauthorized") await expire();
     }

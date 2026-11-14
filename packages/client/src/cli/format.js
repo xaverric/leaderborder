@@ -70,8 +70,8 @@ const labelled = (entries) => {
 
 export const formatSummary = (summary) =>
   labelled([
-    ["Today", formatTotals(summary.today)],
-    ["Week", formatTotals(summary.week)],
+    ["Device today", formatTotals(summary.today)],
+    ["Device week", formatTotals(summary.week)],
     ["Top model", summary.topModel ?? "-"],
   ]);
 
@@ -83,8 +83,8 @@ export const formatStatus = ({ state, apiUrl, hasToken }) =>
     ["Last sync", state.lastSyncAt ?? "never"],
     ...(state.summary
       ? [
-          ["Today", formatTotals(state.summary.today)],
-          ["Week", formatTotals(state.summary.week)],
+          ["Device today", formatTotals(state.summary.today)],
+          ["Device week", formatTotals(state.summary.week)],
           ["Top model", state.summary.topModel ?? "-"],
         ]
       : []),
