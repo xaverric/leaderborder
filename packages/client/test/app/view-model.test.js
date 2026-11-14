@@ -230,3 +230,20 @@ test("warning shows fixed copy without the raw tokscale output", () => {
   assert.equal(view.warning, "Cursor sync skipped");
   assert.equal(toView({ state: baseState, session: baseSession, now: NOW }).warning, null);
 });
+
+test("account view prefers account totals over this device's summary", () => {
+  const totals = { today: { tokens: 67_000_000, costUsd: 62.78 }, week: { tokens: 4_400_000_000, costUsd: 2247.3 }, topModel: "claude-opus-5-5" };
+  const view = toView({ state: baseState, session: { ...baseSession, me: { ...me, totals } }, now: NOW });
+  assert.equal(view.trayTitle, "67M");
+  assert.deepEqual(view.today, { tokens: "67M", cost: "$62.78" });
+  assert.deepEqual(view.week, { tokens: "4.4B", cost: "$2.2K" });
+  assert.equal(view.topModel, "claude-opus-5-5");
+  assert.equal(view.device, "1.2M today, 45.6M this week");
+});
+
+test("account view falls back to this device's summary without account totals", () => {
+  const view = toView({ state: baseState, session: { ...baseSession, me }, now: NOW });
+  assert.deepEqual(view.today, { tokens: "1.2M", cost: "$4.20" });
+  assert.equal(view.topModel, "claude-opus-5");
+  assert.equal(view.device, null);
+});

@@ -91,6 +91,8 @@ const renderAccount = (view) => {
   setText("rank-label", view.rank?.label ?? "-");
   setText("rank-detail", view.rank?.detail ?? "after first sync");
   setText("top-model", view.topModel ?? "No usage yet");
+  setText("device", view.device);
+  toggle("device", Boolean(view.device));
   setText("error-message", view.errorMessage);
   toggle("error", view.kind === "error");
   setText("warning", view.warning);

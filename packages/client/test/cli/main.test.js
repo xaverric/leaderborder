@@ -216,7 +216,7 @@ test("sync uploads and prints the summary", async () => {
   assert.equal(await run(["sync"]), 0);
   assert.equal(calls.sync[0].dryRun, false);
   assert.match(io.stdout.text(), /Uploaded 1 row/);
-  assert.match(io.stdout.text(), /Today:\s+10 tokens/);
+  assert.match(io.stdout.text(), /Device today:\s+10 tokens/);
 });
 
 test("sync prints warnings to stderr", async () => {

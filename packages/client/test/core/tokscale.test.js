@@ -256,8 +256,8 @@ test("cursorStatus reports missing or expired sessions as logged out", async () 
 
 test("cursorSync runs cursor sync", async () => {
   let seen;
-  await cursorSync({ run: async (args) => { seen = args; return { stdout: "", stderr: "" }; } });
-  assert.deepEqual(seen, ["cursor", "sync"]);
+  await cursorSync({ run: async (...args) => { seen = args; return { stdout: "", stderr: "" }; } });
+  assert.deepEqual(seen, [["cursor", "sync"], { timeoutMs: 600000 }]);
 });
 
 const fakeSpawn = (exitCode, calls) => (file, args, options) => {

@@ -87,8 +87,8 @@ test("formatStatus describes a synced device with summary and error", () => {
   });
   assert.match(text, /Logged in:\s+yes/);
   assert.match(text, /Device:\s+Octo Mac \(d1\)/);
-  assert.match(text, /Today:\s+1,500 tokens, \$1\.00/);
-  assert.match(text, /Week:\s+20,000 tokens, \$12\.50/);
+  assert.match(text, /Device today:\s+1,500 tokens, \$1\.00/);
+  assert.match(text, /Device week:\s+20,000 tokens, \$12\.50/);
   assert.match(text, /Top model:\s+claude-opus-5/);
   assert.match(text, /Last error:\s+\[network\] offline/);
 });

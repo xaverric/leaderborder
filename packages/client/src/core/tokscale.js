@@ -7,6 +7,7 @@ import { LeaderborderError } from "./errors.js";
 
 const require = createRequire(import.meta.url);
 const DEFAULT_TIMEOUT_MS = 120000;
+const CURSOR_SYNC_TIMEOUT_MS = 600000;
 const MAX_BUFFER = 64 * 1024 * 1024;
 const STRIPPED_ENV = new Set(["NODE_OPTIONS", "ELECTRON_RUN_AS_NODE", "NODE_TLS_REJECT_UNAUTHORIZED", "TOKSCALE_API_TOKEN"]);
 const CURSOR_SUBCOMMANDS = new Set(["status", "sync", "login"]);
@@ -103,7 +104,7 @@ export const cursorStatus = async ({ run = runTokscale } = {}) => {
   return { loggedIn: /Session:\s*Valid\b/.test(stdout) };
 };
 
-export const cursorSync = ({ run = runTokscale } = {}) => run(["cursor", "sync"]);
+export const cursorSync = ({ run = runTokscale } = {}) => run(["cursor", "sync"], { timeoutMs: CURSOR_SYNC_TIMEOUT_MS });
 
 export const cursorLogin = ({ stdio = "inherit", spawn = nodeSpawn, bin } = {}) =>
   new Promise((resolve, reject) => {

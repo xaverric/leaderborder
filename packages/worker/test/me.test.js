@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { localDay } from "../src/periods.js";
+import { addDays, localDay } from "../src/periods.js";
 import { signValue } from "../src/session.js";
 import { ORIGIN, bearer, call, githubUser, mockGithub, registerDevice, resetDb, row, sessionCookie, uploadRows, userIdOf } from "./helpers.js";
 
@@ -26,8 +26,32 @@ describe("GET /api/me", () => {
       user: { login: "ada", name: "Ada", avatarUrl: "https://avatars.githubusercontent.com/u/1" },
       isAdmin: false,
       rank: null,
+      totals: { today: { tokens: 0, costUsd: 0 }, week: { tokens: 0, costUsd: 0 }, topModel: null },
       devices: [{ id: ada.deviceId, name: "Ada Mac", createdAt: expect.any(String), lastSyncAt: null }],
     });
+  });
+
+  it("reports account totals across devices and counts account-wide Cursor usage once", async () => {
+    const mini = await registerDevice({ token: "gho_ada", deviceName: "Ada Mini" });
+    const yesterday = addDays(today(), -1);
+    const cursor = { client: "cursor", model: "grok-4", output: 0, cacheRead: 0, cacheWrite: 0 };
+    await uploadRows(ada.data.token, ada.deviceId, [
+      row({ day: today() }),
+      row({ day: today(), ...cursor, input: 5000, costUsd: 4 }),
+      row({ day: yesterday, ...cursor, input: 700, costUsd: 0.5 }),
+    ]);
+    await uploadRows(mini.data.token, mini.deviceId, [
+      row({ day: yesterday, input: 1, costUsd: 2 }),
+      row({ day: today(), ...cursor, input: 4000, costUsd: 3 }),
+      row({ day: yesterday, ...cursor, input: 700, costUsd: 0.5 }),
+    ]);
+    const data = await (await call("GET", "/api/me", { headers: bearer(ada.data.token) })).json();
+    expect(data.totals).toEqual({
+      today: { tokens: 6000, costUsd: 5.5 },
+      week: { tokens: 7601, costUsd: 8 },
+      topModel: "grok-4",
+    });
+    expect(data.rank.value).toBe(7601);
   });
 
   it("works with a session cookie and reports the weekly rank", async () => {
