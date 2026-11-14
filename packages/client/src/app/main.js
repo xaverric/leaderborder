@@ -7,17 +7,20 @@ import {
   nativeImage,
   nativeTheme,
   powerMonitor,
+  protocol,
   screen,
   session,
   shell,
   Tray,
 } from "electron";
+import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { createController, externalHosts, isAllowedExternalUrl } from "./controller.js";
 import { createHandlers, registerIpc } from "./ipc.js";
 import { POPOVER_SIZE, popoverPosition, shouldShowOnClick } from "./position.js";
+import { createRendererHandler, RENDERER_URL } from "./renderer-protocol.js";
 
 const FAKE_CORE = !app.isPackaged && process.env.LEADERBORDER_FAKE_CORE === "1";
 const DEVTOOLS = process.env.LEADERBORDER_DEVTOOLS === "1";
@@ -25,8 +28,6 @@ const PAPER = { light: "#fcfcfd", dark: "#0f1012" };
 const FIRST_SHOW_DELAY_MS = 400;
 
 const resolveHere = (relative) => fileURLToPath(new URL(relative, import.meta.url));
-const INDEX_PATH = resolveHere("./renderer/index.html");
-const INDEX_HREF = pathToFileURL(INDEX_PATH).href;
 const PRELOAD_PATH = resolveHere("./preload.cjs");
 const TRAY_ICON_PATH = resolveHere("../../assets/trayTemplate.png");
 
@@ -116,9 +117,10 @@ const run = async () => {
     },
   });
 
-  registerIpc({ ipcMain, handlers: createHandlers({ controller, quit: () => app.quit() }), expectedHref: INDEX_HREF });
+  registerIpc({ ipcMain, handlers: createHandlers({ controller, quit: () => app.quit() }), expectedHref: RENDERER_URL });
 
   await app.whenReady();
+  protocol.handle("leaderborder", createRendererHandler((file) => readFile(resolveHere(`./renderer/${file}`))));
   app.dock?.hide();
   Menu.setApplicationMenu(null);
   session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
@@ -173,7 +175,7 @@ const run = async () => {
   });
   powerMonitor.on("resume", () => controller.resume());
 
-  await win.loadFile(INDEX_PATH);
+  await win.loadURL(RENDERER_URL);
   const view = await controller.init();
   controller.start();
   if (view.kind === "signed-out") setTimeout(showPopover, FIRST_SHOW_DELAY_MS);
@@ -182,6 +184,7 @@ const run = async () => {
 if (FAKE_CORE) app.setPath("userData", join(tmpdir(), `leaderborder-fake-${process.pid}`));
 
 hardenContents();
+protocol.registerSchemesAsPrivileged([{ scheme: "leaderborder", privileges: { standard: true, secure: true } }]);
 
 if (app.requestSingleInstanceLock()) {
   run().catch((error) => {

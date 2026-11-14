@@ -1,8 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CHANNELS, createHandlers, isTrustedUrl, registerIpc } from "../../src/app/ipc.js";
+import { RENDERER_URL } from "../../src/app/renderer-protocol.js";
 
-const INDEX = "file:///Applications/Leaderborder.app/Contents/Resources/app.asar/src/app/renderer/index.html";
+const INDEX = RENDERER_URL;
 
 const fakeController = () => {
   const calls = [];
@@ -78,6 +79,8 @@ test("isTrustedUrl compares protocol and path only", () => {
   assert.equal(isTrustedUrl(INDEX, `${INDEX}?x=1`), true);
   assert.equal(isTrustedUrl(INDEX, INDEX.replace("index.html", "other.html")), false);
   assert.equal(isTrustedUrl(INDEX, "https://evil.example/index.html"), false);
+  assert.equal(isTrustedUrl(INDEX, "leaderborder://evil/index.html"), false);
+  assert.equal(isTrustedUrl(INDEX, "file:///index.html"), false);
   assert.equal(isTrustedUrl(INDEX, undefined), false);
   assert.equal(isTrustedUrl(INDEX, "::"), false);
 });
